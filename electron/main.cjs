@@ -176,6 +176,9 @@ function createSplashWindow() {
 }
 
 function createMainWindow() {
+  const iconPath = path.join(APP_ROOT, 'assets', 'icon.png');
+  const fallbackIcon = path.join(APP_ROOT, 'build', 'icon.png');
+  const winIcon = fs.existsSync(iconPath) ? iconPath : (fs.existsSync(fallbackIcon) ? fallbackIcon : undefined);
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -185,6 +188,7 @@ function createMainWindow() {
     backgroundColor: '#0a0a0f',
     autoHideMenuBar: true,
     title: 'NUVI',
+    icon: winIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
