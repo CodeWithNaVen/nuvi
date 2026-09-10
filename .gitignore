@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build
+dist/
+release/
+agent_dist/
+agent_build/
+
+# Env / secrets
+.env
+secrets.json
+memories.json
+settings.json
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Frontend reference is kept as read-only reference; don't ignore
+# frontend_reference/
+
+# Temp
+*.log

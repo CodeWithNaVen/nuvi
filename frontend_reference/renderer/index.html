@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="claude-code">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob: http://127.0.0.1:877 ws://127.0.0.1:877 http://127.0.0.1:8765 ws://127.0.0.1:8765 https://www.youtube.com https://i.ytimg.com; script-src 'self' 'unsafe-inline'; frame-src 'self' http://127.0.0.1:877 https://www.youtube.com https://youtube.com; img-src 'self' data: blob: https://i.ytimg.com https://www.youtube.com; connect-src 'self' http://127.0.0.1:877 ws://127.0.0.1:877 http://127.0.0.1:8765 ws://127.0.0.1:8765 https://www.youtube.com;" />
+  <title>Nuvi</title>
+  <link rel="stylesheet" href="styles/themes.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="titlebar">
+      <div class="brand"><span class="dot"></span> NUVI</div>
+      <div class="titlebar-actions">
+        <button id="min-btn" title="Minimize">–</button>
+        <button id="close-btn" title="Close">×</button>
+      </div>
+    </div>
+
+    <div id="main">
+      <div id="stage">
+        <canvas id="orb-canvas"></canvas>
+        <div id="status-line">Say something, or click the mic to talk.</div>
+        <div id="controls">
+          <button class="icon-btn" id="screen-btn" title="Screen vision">🖥️</button>
+          <button class="icon-btn" id="camera-btn" title="Camera vision">📷</button>
+          <button id="mic-btn" title="Talk to Nuvi">🎙️</button>
+          <button class="icon-btn" id="type-btn" title="Type instead">⌨️</button>
+          <button class="icon-btn" id="settings-btn" title="Settings">⚙️</button>
+        </div>
+      </div>
+
+      <div id="sidebar">
+        <div id="sidebar-tabs">
+          <button class="tab-btn active" data-panel="transcript-panel">Chat</button>
+          <button class="tab-btn" data-panel="settings-panel">Settings</button>
+          <button class="tab-btn" data-panel="memory-panel">Memory</button>
+        </div>
+
+        <div id="transcript-panel" class="panel active" style="padding:0;">
+          <div id="transcript"></div>
+          <div style="padding:10px; border-top:1px solid var(--border-soft); display:flex; gap:8px;">
+            <input id="text-input" type="text" placeholder="Type a message…" style="flex:1; background:var(--bg-panel); border:1px solid var(--border); color:var(--text); padding:9px 10px; border-radius:8px; font-size:13px;" />
+            <button class="primary" id="send-btn">Send</button>
+          </div>
+        </div>
+
+        <div id="settings-panel" class="panel">
+          <div class="field">
+            <label>Assistant name</label>
+            <input type="text" id="assistant-name-input" placeholder="Nuvi" />
+          </div>
+          <div class="field">
+            <label>Your name</label>
+            <input type="text" id="user-name-input" placeholder="What should Nuvi call you?" />
+          </div>
+
+          <div class="field">
+            <label>Theme</label>
+            <div class="theme-row">
+              <div class="theme-swatch" data-theme="claude-code">Claude Code</div>
+              <div class="theme-swatch" data-theme="midnight">Midnight</div>
+              <div class="theme-swatch" data-theme="light">Light</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Groq API key <span id="groq-badge" class="badge off">not set</span></label>
+            <input type="password" id="groq-key-input" placeholder="gsk_..." />
+            <div class="hint">Used for chat reasoning, tool-calling, and speech-to-text (Whisper). Free tier at <a href="#" data-link="https://console.groq.com/keys">console.groq.com/keys</a></div>
+          </div>
+
+          <div class="field">
+            <label>Gemini API key <span id="gemini-badge" class="badge off">not set</span></label>
+            <input type="password" id="gemini-key-input" placeholder="AIza..." />
+            <div class="hint">Used for screen & camera vision. Free tier at <a href="#" data-link="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a></div>
+          </div>
+
+          <div class="field">
+            <label>Voice engine</label>
+            <select id="tts-engine-select">
+              <option value="edge">Edge Neural (free, no key needed)</option>
+              <option value="groq">Groq PlayAI</option>
+              <option value="browser">Browser native (fastest, offline)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Voice</label>
+            <select id="tts-voice-select"></select>
+          </div>
+
+          <div class="row">
+            <span>Screen vision (Gemini screen sharing)</span>
+            <label class="toggle"><input type="checkbox" id="screen-toggle"><span class="slider"></span></label>
+          </div>
+          <div class="row">
+            <span>Camera vision</span>
+            <label class="toggle"><input type="checkbox" id="camera-toggle"><span class="slider"></span></label>
+          </div>
+
+          <div class="field" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:4px;">
+            <label>Wake Word (Myraa parity)</label>
+            <div class="row"><span>Enable wake word</span><label class="toggle"><input type="checkbox" id="wake-toggle"><span class="slider"></span></label></div>
+            <input type="text" id="wake-phrase-input" placeholder="hey nuvi" style="margin-top:6px;" />
+            <div class="hint">Say this phrase to activate Nuvi hands-free (Web Speech API).</div>
+            <label style="margin-top:8px; font-size:11px;">Sensitivity</label>
+            <input type="range" id="wake-sensitivity" min="0" max="100" value="60" style="width:100%; accent-color:var(--accent);" />
+          </div>
+
+          <div class="field" style="border-top:1px solid var(--border-soft); padding-top:12px;">
+            <label>System</label>
+            <div class="row"><span>Launch at startup (auto-start)</span><label class="toggle"><input type="checkbox" id="autostart-toggle"><span class="slider"></span></label></div>
+            <div class="row" style="margin-top:8px;"><span>UI animations</span><label class="toggle"><input type="checkbox" id="animations-toggle" checked><span class="slider"></span></label></div>
+            <div class="hint" style="margin-top:6px;">Auto-start uses Windows registry via desktop agent (port 8765). Animations control orb transitions.</div>
+          </div>
+
+          <div class="hint" style="background:var(--bg-panel); border:1px solid var(--border-soft); border-radius:8px; padding:10px; font-size:11px; line-height:1.5;">
+            <strong style="color:var(--text);">Models (Myraa exact):</strong><br/>
+            Live: <code>gemini-3.1-flash-live-preview</code> (voice Aoede)<br/>
+            Memory: <code>gemini-3.5-flash</code><br/>
+            Vision: <code>gemini-2.5-flash</code>
+          </div>
+
+          <button class="primary" id="save-settings-btn">Save settings</button>
+        </div>
+
+        <div id="memory-panel" class="panel">
+          <div class="field">
+            <label>Known facts / preferences (legacy)</label>
+            <div id="memory-list" class="hint">Loading…</div>
+          </div>
+          <div class="field" style="border-top:1px solid var(--border-soft); padding-top:12px;">
+            <label>Recollections — Myraa categories</label>
+            <div id="memory-list-myraa" class="hint">Loading recollections…</div>
+          </div>
+          <div class="field">
+            <label>Teach Nuvi something</label>
+            <select id="memory-category" style="background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px; font-size:12px;">
+              <option value="preference">Preference</option>
+              <option value="identity">Identity</option>
+              <option value="goal">Goal</option>
+              <option value="project">Project</option>
+              <option value="relationship">Relationship</option>
+              <option value="emotional">Emotional</option>
+              <option value="behavior">Behavior</option>
+            </select>
+            <textarea id="memory-input" rows="3" placeholder="e.g. I prefer VS Code over Sublime" style="background:var(--bg-panel); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px; font-size:13px; resize:vertical; margin-top:6px;"></textarea>
+            <button class="ghost" id="memory-save-btn">Save to memory</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
