@@ -83,9 +83,6 @@ function startBackend() {
   const agentExe = app.isPackaged
     ? path.join(process.resourcesPath, 'agent', 'nuvi-agent.exe')
     : path.join(APP_ROOT, 'agent_dist', 'nuvi-agent', 'nuvi-agent.exe');
-  // Legacy fallback: try nuvi name then myraa name
-  const legacyAgentExe = app.isPackaged ? path.join(process.resourcesPath, 'agent', 'myraa-agent.exe') : path.join(APP_ROOT, 'agent_dist', 'myraa-agent', 'myraa-agent.exe');
-  const resolvedAgentExe = (agentExe && fs.existsSync(agentExe)) ? agentExe : (fs.existsSync(legacyAgentExe) ? legacyAgentExe : agentExe);
 
   const env = {
     ...process.env,
@@ -95,8 +92,8 @@ function startBackend() {
     NUVI_DATA_DIR: dataDir,
     NUVI_APP_ROOT: APP_ROOT,
   };
-  if (fs.existsSync(resolvedAgentExe)) {
-    env.NUVI_AGENT_EXE = resolvedAgentExe;
+  if (fs.existsSync(agentExe)) {
+    env.NUVI_AGENT_EXE = agentExe;
   }
 
   serverProcess = spawn(process.execPath, [SERVER_ENTRY], {

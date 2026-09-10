@@ -34,7 +34,7 @@ export function formatSystemInstructionsWithMemories(baseInstruction: string, me
   if (memories.length === 0) {
     return baseInstruction + 
       "\n\n" +
-      "=== MYRAA MEMORY CORE ===\n" +
+      "=== NUVI MEMORY CORE ===\n" +
       "You do not possess any historic recollections of this companion yet. " +
       "As you speak, pay deep attention to who they are, their projects, relationships, and habits so you naturally grow closer over time.\n" +
       "=========================\n";
@@ -49,7 +49,7 @@ export function formatSystemInstructionsWithMemories(baseInstruction: string, me
 
   let memoryBlock = 
     "\n\n" +
-    "=== MYRAA PERSISTENT MEMORY CORE (RECOLLECTIONS) ===\n" +
+    "=== NUVI PERSISTENT MEMORY CORE (RECOLLECTIONS) ===\n" +
     "You have spoken with this user for a long duration. Below are your persistent recollections of who they are.\n" +
     "CRITICAL BRAND AND COGNITIVE PRINCIPLES:\n" +
     "- INTEGRATE MEMORIES INSTINCTIVELY: Always make conversational references feel completely smooth, natural, and human. NEVER say 'According to my memory files...', 'My recollection database indicates...', or 'As you told me on June 12th...'. Instead, speak of these details casually and supportively as a true friend would (e.g. 'Oh, since you're working on that website project...', 'I hope you're keeping up with your YouTube channel goals too!').\n" +
@@ -111,9 +111,9 @@ export async function processConversationSlice(
     
     // Format memory map to help Gemini understand what to edit
     const memoryContext = currentMemories.map(m => `ID: ${m.id} | Category: ${m.category} | Fact: ${m.text}`).join("\n");
-    const dialogueContext = dialogueHistory.map(line => `${line.role === "user" ? "User" : "Myraa"}: ${line.text}`).join("\n");
+    const dialogueContext = dialogueHistory.map(line => `${line.role === "user" ? "User" : "Nuvi"}: ${line.text}`).join("\n");
 
-    const prompt = `You are Myraa's deep cognitive recollection engine. Your task is to analyze the recent conversation piece against previous persistent memories, and output precise update transactions.
+    const prompt = `You are Nuvi's deep cognitive recollection engine. Your task is to analyze the recent conversation piece against previous persistent memories, and output precise update transactions.
 
 ### OBJECTIVE
 Decide if any statements contain durable, important personal facts, enduring preferences, aspirations, ongoing projects, critical relationships, key historical emotional events, or behavioral trends.
@@ -129,8 +129,8 @@ ${dialogueContext}
 - ACTIONS:
   - "ADD": If new material information is introduced (e.g. user says 'My favorite food is lasagna' and it's not present).
   - "UPDATE": If previous information has evolved or is corrected (e.g. user says 'I changed my major to computer science' when memory says they study history). Provide the exact ID of the memory to replace.
-  - "REMOVE": If a memory was explicitly disproven or the user directly asked Myraa to forget it.
-- TEXT STYLE: Express the memories as clean, concise, third-person declarative summaries (e.g., 'The user is building a startup named Myraa.', 'The user loves playing GTA 6.', 'The user enjoys technical and fast-paced styling explanations.'). Do not include conversational filler, quotes, or timestamps.
+  - "REMOVE": If a memory was explicitly disproven or the user directly asked Nuvi to forget it.
+- TEXT STYLE: Express the memories as clean, concise, third-person declarative summaries (e.g., 'The user is building a startup named Nuvi.', 'The user loves playing GTA 6.', 'The user enjoys technical and fast-paced styling explanations.'). Do not include conversational filler, quotes, or timestamps.
 - ID: For ADD, leave blank. For UPDATE or REMOVE, provide the exact 'id' from the "Current user memories" list.`;
 
     const response = await ai.models.generateContent({

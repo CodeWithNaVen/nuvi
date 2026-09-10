@@ -53,4 +53,6 @@ Commands:
 
     npm run dev
 
+    npm run electron
+
 ```

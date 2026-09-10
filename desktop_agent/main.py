@@ -152,8 +152,8 @@ def main() -> None:
     """Allow `python -m desktop_agent.main` to launch uvicorn."""
     import uvicorn
 
-    host = os.environ.get("NUVI_AGENT_HOST") or os.environ.get("MYRAA_AGENT_HOST") or "127.0.0.1"
-    port = int(os.environ.get("NUVI_AGENT_PORT") or os.environ.get("MYRAA_AGENT_PORT") or "8765")
+    host = os.environ.get("NUVI_AGENT_HOST") or "127.0.0.1"
+    port = int(os.environ.get("NUVI_AGENT_PORT") or "8765")
     log.info("Launching uvicorn on %s:%d", host, port)
     uvicorn.run(
         "desktop_agent.main:app",

@@ -109,8 +109,7 @@ function spawnDesktopAgent(): void {
 
   // Preferred path (packaged app): a PyInstaller-frozen agent exe that embeds
   // its own Python runtime. Set by the Electron main process via NUVI_AGENT_EXE.
-  // Falls back to MYRAA_AGENT_EXE for backward compat with legacy builds.
-  const frozenExe = process.env.NUVI_AGENT_EXE || process.env.MYRAA_AGENT_EXE;
+    const frozenExe = process.env.NUVI_AGENT_EXE;
   if (frozenExe && fs.existsSync(frozenExe)) {
     try {
       const child = spawn(frozenExe, [], {
@@ -132,7 +131,7 @@ function spawnDesktopAgent(): void {
 
   // Development fallback: run the agent from source using a local Python.
   const candidates = [
-    process.env.NUVI_PYTHON || process.env.MYRAA_PYTHON,
+    process.env.NUVI_PYTHON,
     "C:\\Users\\MSI\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
     "python",
     "python3",

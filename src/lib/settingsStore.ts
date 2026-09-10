@@ -46,15 +46,9 @@ const NEVER_PERSIST: ReadonlySet<keyof NuviSettings> = new Set([]);
 export function loadSettings(): NuviSettings {
   if (typeof window === "undefined") return { ...DEFAULT_SETTINGS };
   try {
-    let raw = window.localStorage.getItem(STORAGE_KEY);
-    // Legacy fallback: migrate from Myraa storage key
-    if (!raw) raw = window.localStorage.getItem("myraa.settings.v2");
+    const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<NuviSettings>;
-    // Normalize legacy wake phrase
-    if (parsed.wakePhrase?.toLowerCase().includes("myraa")) {
-      parsed.wakePhrase = "hey nuvi";
-    }
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch {
     return { ...DEFAULT_SETTINGS };
