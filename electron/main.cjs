@@ -16,7 +16,7 @@
 
 'use strict';
 
-const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, desktopCapturer, session } = require('electron');
 const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
@@ -198,6 +198,41 @@ function createMainWindow() {
   });
 
   Menu.setApplicationMenu(null);
+
+  // Screen capture for Electron — getDisplayMedia is not natively supported,
+  // must be handled via desktopCapturer. This makes the "Share Screen" button
+  // in App.tsx work identically to the web version.
+  // Uses the default session handler (Electron 30+ API).
+  try {
+    const ses = session.defaultSession;
+    ses.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
+        if (sources.length === 0) {
+          callback({});
+          return;
+        }
+        callback({
+          video: request.videoRequested ? sources[0] : undefined,
+          audio: request.audioRequested ? 'loopback' : undefined,
+        });
+      }).catch(() => callback({}));
+    }, { useSystemPicker: true });
+
+    ses.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === 'media' || permission === 'display-capture') callback(true);
+      else callback(false);
+    });
+  } catch (e) {
+    console.warn('[Nuvi] setDisplayMediaRequestHandler failed:', e.message);
+  }
+
+  try {
+    mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
+        callback({ video: sources[0] });
+      });
+    });
+  } catch {}
 
   // Open external links (http/https to non-local hosts) in the real browser
   // instead of navigating the app window.
