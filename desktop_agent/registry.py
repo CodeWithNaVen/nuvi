@@ -125,6 +125,7 @@ DESKTOP_TOOL_NAMES = [
     "desktopBrowserGoBack",
     "desktopBrowserGoForward",
     "desktopBrowserScroll",
+    "desktopBrowserTask",
     # coding assistance
     "createPythonFile",
     "runPythonScript",
@@ -142,6 +143,14 @@ DESKTOP_TOOL_NAMES = [
     "enableAutoStart",
     "disableAutoStart",
     "getAutoStartStatus",
+    # OS-level mouse / cursor control (pyautogui)
+    "getMousePosition",
+    "moveMouse",
+    "clickMouse",
+    "doubleClickMouse",
+    "dragMouse",
+    "scrollMouse",
+    "clickText",
 ]
 
 
@@ -163,6 +172,7 @@ _MODULE_NAMES = [
     "tools_coding",
     "tools_system",
     "tools_startup",
+    "tools_mouse",
 ]
 
 

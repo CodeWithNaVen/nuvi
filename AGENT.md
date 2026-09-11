@@ -1,7 +1,7 @@
 # AGENT.md — Nuvi
 
 ## Overview
-Nuvi is a Jarvis-like agentic desktop assistant. Voice-first, with screen vision, holographic browser projection, persistent memory, and full Windows control via a local Python agent. The desktop build is Electron; the web build is Vite + React.
+Nuvi is a Jarvis-like agentic desktop assistant. Voice-first, with screen vision, persistent memory, and full Windows control via a local Python agent that opens the real browser and real desktop apps. The desktop build is Electron; the web build is Vite + React.
 
 ## Tech Stack
 - **Frontend:** React 19 + Vite 6 + Tailwind CSS 4 + motion + lucide-react

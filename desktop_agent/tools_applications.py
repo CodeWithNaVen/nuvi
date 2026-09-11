@@ -41,6 +41,8 @@ APP_COMMANDS: Dict[str, Dict[str, str]] = {
     "wordpad": {"shell": "write", "image": "wordpad.exe", "label": "WordPad"},
     "paint": {"shell": "mspaint", "image": "mspaint.exe", "label": "Paint"},
     "snipping tool": {"uwp": "ms-screenclip:", "image": "ScreenClippingHost.exe", "label": "Snipping Tool"},
+    "whatsapp": {"exe": "WhatsApp.exe", "image": "WhatsApp.exe", "label": "WhatsApp"},
+    "whatsapp beta": {"exe": "WhatsAppBeta.exe", "image": "WhatsAppBeta.exe", "label": "WhatsApp Beta"},
 }
 
 
@@ -72,18 +74,31 @@ def _launch(spec: Dict[str, str]) -> None:
     try:
         if "exe" in spec:
             exe = spec["exe"]
-            if shutil.which(exe) or exe.lower().endswith(".exe"):
-                # Detached so we don't block the agent.
+            label = spec.get("label", "")
+            # Try direct PATH resolution first; fall back to shell App Paths / start
+            resolved = shutil.which(exe)
+            if resolved:
                 subprocess.Popen(
-                    [exe],
+                    [resolved],
                     shell=False,
                     close_fds=True,
                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0)
                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
                 )
             else:
-                # e.g. `code.cmd` lives in PATH; rely on shell resolution.
-                subprocess.Popen(f'start "" "{exe}"', shell=True, close_fds=True)
+                # Use shell start which resolves App Paths registry (Chrome, WhatsApp, etc.)
+                # and handles Store UWP aliases. Fall back to explorer shell verb.
+                try:
+                    subprocess.Popen(f'start "" "{exe}"', shell=True, close_fds=True)
+                except Exception:
+                    # Last resort: try without quotes for PATH with spaces
+                    subprocess.Popen(f'start "" {exe}', shell=True, close_fds=True)
+                # WhatsApp Store UWP fallback: Store version is not WhatsApp.exe in PATH
+                if label == "WhatsApp":
+                    try:
+                        subprocess.Popen('start "" whatsapp:', shell=True, close_fds=True)
+                    except Exception:
+                        pass
         elif "shell" in spec:
             subprocess.Popen(
                 f'start "" {spec["shell"]}', shell=True, close_fds=True

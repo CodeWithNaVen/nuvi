@@ -1,9 +1,9 @@
 """
-Website control: open named sites or arbitrary URLs in the default browser.
+Website control: open named sites or arbitrary URLs in the user's real default browser.
 
-Uses the OS default-browser handler so the user's real Chrome/Edge/Firefox
-opens at the requested destination (independent of the Playwright automation
-browser and the in-app holographic BrowserAgent).
+Uses the OS default-browser handler so the user's actual Chrome/Edge/Firefox
+window opens at the requested destination, independent of the Playwright-based
+desktop automation browser used for in-page interaction.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ SITE_URLS: Dict[str, str] = {
     "reddit": "https://www.reddit.com",
     "twitter": "https://twitter.com",
     "x": "https://x.com",
+    "whatsapp": "https://web.whatsapp.com",
     "instagram": "https://www.instagram.com",
     "facebook": "https://www.facebook.com",
     "linkedin": "https://www.linkedin.com",

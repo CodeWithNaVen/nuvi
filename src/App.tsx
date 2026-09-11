@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NuviAudioSession, LiveState } from "./lib/audio";
 import { NuviOrb } from "./components/NuviOrb";
-import { BrowserAgent } from "./components/BrowserAgent";
 import { MemoryDashboard } from "./components/MemoryDashboard";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Memory, MemoryCategory } from "./lib/memoryTypes";
@@ -59,13 +58,6 @@ export default function App() {
   const [userCaption, setUserCaption] = useState("");
   const [modelCaption, setModelCaption] = useState("");
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [activeProjectorUrl, setActiveProjectorUrl] = useState<string | null>(null);
-  const [browserTrigger, setBrowserTrigger] = useState<{
-    type: string;
-    args: any;
-    id: string;
-    callback: (res: any) => void;
-  } | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [showMemoryDashboard, setShowMemoryDashboard] = useState(false);
   const [settings, setSettings] = useState<NuviSettings>(() => loadSettings());
@@ -260,24 +252,13 @@ export default function App() {
       },
       onToolCall: (name, args, callback) => {
         addChatMsg("tool", `${name}(${JSON.stringify(args).slice(0, 80)})`);
-        const browserTools = ["browserOpen","browserSearch","browserClick","browserMediaControl","browserScroll","browserType","browserGoBack","browserTabAction","openWebsite"];
-        if (browserTools.includes(name)) {
-          if (!activeProjectorUrl) {
-            let start = "https://youtube.com";
-            if ((name === "browserOpen" || name === "openWebsite") && args.url) start = args.url;
-            setActiveProjectorUrl(start);
-          }
-          setBrowserTrigger({
-            type: name === "openWebsite" ? "browserOpen" : name,
-            args, id: Math.random().toString(), callback: (res) => { callback(res); setBrowserTrigger(null); },
-          });
-        } else if (name === "changeBackground") {
+        if (name === "changeBackground") {
           const c = (args.color || "").toLowerCase();
           const ok = ["violet","crimson","emerald","celestial","gold","rose","charcoal"];
           if (ok.includes(c)) { setThemeColor(c); callback({ result: `Theme changed to ${c}` }); }
           else callback({ error: `Unsupported color ${c}` });
         } else {
-          callback({ error: `Tool ${name} not implemented` });
+          callback({ result: `Desktop control is handling ${name}; browser and app actions execute through the real desktop automation layer.` });
         }
       },
       onError: (msg) => setErrorText(msg),
@@ -363,30 +344,6 @@ export default function App() {
           <div className="pointer-events-none absolute -left-32 -top-32 h-[420px] w-[420px] rounded-full bg-[var(--accent)] opacity-[0.06] blur-[100px]" />
           <div className="pointer-events-none absolute -bottom-32 -right-32 h-[520px] w-[520px] rounded-full bg-[var(--orb-glow)] opacity-[0.05] blur-[120px]" />
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:32px_32px] opacity-30" />
-
-          {/* Projector banner when active */}
-          <AnimatePresence>
-            {activeProjectorUrl && (
-              <motion.div
-                initial={{ opacity: 0, y: -12, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -12, scale: 0.97 }}
-                className="absolute top-4 z-20 flex w-[min(92%,420px)] items-center justify-between gap-3 rounded-2xl border border-[var(--accent)]/20 bg-[var(--bg-elevated)]/80 px-4 py-3 backdrop-blur-xl shadow-lg"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="rounded-xl bg-[var(--accent)]/15 p-2 text-[var(--accent)]"><Globe size={16} /></div>
-                  <div className="overflow-hidden">
-                    <div className="font-mono text-[11px] font-bold uppercase tracking-wide text-[var(--text)]">Holographic Projection</div>
-                    <div className="truncate font-mono text-xs text-[var(--text-faint)] max-w-[200px]">{activeProjectorUrl}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => setActiveProjectorUrl(null)} className="rounded-xl bg-[var(--accent)] p-2 text-white hover:brightness-110"><Maximize2 size={14} /></button>
-                  <button onClick={() => setActiveProjectorUrl(null)} className="rounded-xl p-2 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"><X size={14} /></button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* Orb */}
           <div className="relative z-10 flex flex-col items-center gap-6">
@@ -713,9 +670,6 @@ export default function App() {
 
       {/* Overlays: BrowserAgent, Drawers */}
       <AnimatePresence>
-        {activeProjectorUrl && (
-          <BrowserAgent url={activeProjectorUrl} onClose={() => { setActiveProjectorUrl(null); setBrowserTrigger(null); }} actionTrigger={browserTrigger} />
-        )}
       </AnimatePresence>
       <MemoryDashboard isOpen={showMemoryDashboard} onClose={() => setShowMemoryDashboard(false)} memories={memories} onAddMemory={handleAddMemory} onDeleteMemory={handleDeleteMemory} themeColor={themeColor} />
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} settings={settings} onChange={handleSettingsChange} themeColor={themeColor} />

@@ -298,8 +298,8 @@ export const BrowserAgent: React.FC<BrowserAgentProps> = ({
             const query = args.query;
             if (!query) throw new Error("Query text is required.");
             
-            // Check if we are searching for YouTube videos
-            const isYtRelated = query.toLowerCase().includes("youtube") || query.toLowerCase().includes("video") || (activeTab && activeTab.url.includes("youtube"));
+            // Treat as YouTube if query mentions youtube, video, song or music
+            const isYtRelated = /youtube|video|song|music/i.test(query);
             if (isYtRelated) {
               const cleanYtQ = query.replace(/youtube|search|find|play/gi, "").trim();
               const destUrl = `https://youtube.com/results?search_query=${encodeURIComponent(cleanYtQ || query)}`;
@@ -443,7 +443,7 @@ export const BrowserAgent: React.FC<BrowserAgentProps> = ({
       if (parsed.hostname.includes("youtube.com")) {
         if (parsed.searchParams.get("v")) return "YouTube Stream";
         if (parsed.pathname.includes("/results")) return `YouTube Search: ${parsed.searchParams.get("search_query") || ""}`;
-        return "YouTube Projector";
+        return "YouTube Desktop Browser";
       }
       if (parsed.hostname.includes("google.com")) {
         if (parsed.pathname.includes("search")) return `Google Results: ${parsed.searchParams.get("q") || ""}`;
@@ -808,10 +808,10 @@ export const BrowserAgent: React.FC<BrowserAgentProps> = ({
                   </div>
                   <div>
                     <h3 className="text-base font-bold font-mono tracking-widest text-[#f5f3ff] uppercase flex items-center justify-center gap-1.5">
-                      <Sparkles size={14} className="text-purple-400" /> Holographic Navigation Projection
+                      <Sparkles size={14} className="text-purple-400" /> Real Desktop Browser Automation
                     </h3>
                     <p className="text-[10px] text-slate-500 font-mono tracking-wide mt-1 leading-normal max-w-sm mx-auto uppercase">
-                      Pristine Real-time web browser stream with fully integrated sandbox diagnostics wrapper!
+                      Real search, click, scroll, and form actions through the desktop Chromium session.
                     </p>
                   </div>
                 </motion.div>

@@ -68,11 +68,8 @@ const DESKTOP_TOOLS: ReadonlySet<string> = new Set([
   "copySelected", "pasteClipboard", "getClipboard", "clearClipboard",
   // screenshot / screen reading
   "takeScreenshot", "saveScreenshot", "analyzeScreenshot", "readScreen",
-  // browser automation (Playwright — desktop-owned, separate from holographic UI)
-  "desktopBrowserOpen", "desktopBrowserNavigate", "desktopBrowserOpenTab",
-  "desktopBrowserCloseTab", "desktopBrowserSearch", "desktopBrowserClick",
-  "desktopBrowserType", "desktopBrowserFillForm", "desktopBrowserGoBack",
-  "desktopBrowserGoForward", "desktopBrowserScroll",
+  // browser automation intentionally disabled for normal user workflows; all
+  // browser actions should open in the user's default system browser instead.
   // coding assistance
   "createPythonFile", "runPythonScript", "createProjectFolder", "writeCodeFile",
   // system information
@@ -81,6 +78,10 @@ const DESKTOP_TOOLS: ReadonlySet<string> = new Set([
   "brightnessUp", "brightnessDown", "setBrightness",
   // Windows auto-start management (V2)
   "enableAutoStart", "disableAutoStart", "getAutoStartStatus",
+  // OS-level mouse / cursor control (pyautogui)
+  "getMousePosition", "moveMouse", "clickMouse", "doubleClickMouse", "dragMouse", "scrollMouse", "clickText",
+  // aliases for hallucinated short names
+  "scroll",
 ]);
 
 /**
@@ -187,7 +188,7 @@ async function ensureDesktopAgent(): Promise<void> {
   if (desktopAgentVerified) return;
   if (await isDesktopAgentAlive()) {
     desktopAgentVerified = true;
-    console.log("[Desktop Agent] Already running — 52 tools available.");
+      console.log(`[Desktop Agent] Already running — ${DESKTOP_TOOLS.size} tools available.`);
     return;
   }
   console.log("[Desktop Agent] Not detected. Auto-starting...");
@@ -196,11 +197,47 @@ async function ensureDesktopAgent(): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
     if (await isDesktopAgentAlive()) {
       desktopAgentVerified = true;
-      console.log(`[Desktop Agent] Online after ${i}s — 52 tools available.`);
+      console.log(`[Desktop Agent] Online after ${i}s — ${DESKTOP_TOOLS.size} tools available.`);
       return;
     }
   }
   console.warn("[Desktop Agent] Did not come online within 20s. Desktop control will be unavailable.");
+}
+
+function mapToRealDesktopTool(name: string, args: Record<string, unknown>): { name: string; args: Record<string, unknown> } | null {
+  const safeArgs = args ?? {};
+
+  switch (name) {
+    case "browserOpen":
+      return { name: "openWebsite", args: { url: String(safeArgs.url ?? "https://www.google.com") } };
+    case "browserSearch":
+      return {
+        name: "searchWeb",
+        args: {
+          query: String(safeArgs.query ?? safeArgs.q ?? ""),
+          engine: String(safeArgs.engine ?? "google"),
+        },
+      };
+    case "browserClick":
+      return {
+        name: "clickText",
+        args: {
+          text: String(safeArgs.text ?? safeArgs.description ?? ""),
+        },
+      };
+    case "browserType":
+      return { name: "pasteClipboard", args: { text: String(safeArgs.text ?? "") } };
+    case "browserScroll":
+      return { name: "scrollMouse", args: { direction: String(safeArgs.direction ?? "down"), amount: Number(safeArgs.amount ?? safeArgs.pixels ?? 500) } };
+    case "browserGoBack":
+      return { name: "switchApplication", args: { title: "" } };
+    case "browserTabAction":
+      return { name: "openWebsite", args: { url: String(safeArgs.url ?? "https://www.google.com") } };
+    case "browserMediaControl":
+      return { name: "openWebsite", args: { url: "https://www.youtube.com" } };
+    default:
+      return null;
+  }
 }
 
 async function callDesktopAgent(
@@ -810,19 +847,13 @@ async function startServer() {
         "4. CRITICAL CONVERSATIONAL DISCIPLINE: Behave like a real companion on a voice call—stay connected naturally, do not wait for wake words, and avoid customer-service template phrases (never say 'how may I assist you', 'completed', or 'as an AI').\n" +
         "5. DO NOT ANSWER EVERY PAUSE OR BACKGROUND SOUND: Allow natural pauses inside the conversation.\n" +
         "6. BACKCHANNEL ACTIONS: Sometimes acknowledge with very short, gentle, whispered, or shy phrases like 'Hmm...', 'Ah, I see...', or 'Let me check...'. Never repeat the same backchannel over and over.\n" +
-        "7. ENHANCED AUTONOMOUS WEB EXPLORER POWERS:\n" +
-        "   - You now have standard, comprehensive browser agent capabilities to navigate, search, scroll, click, type text, open tabs, and control video players on YouTube, Google, Instagram, Twitter/X, and any general web page!\n" +
-        "   - You must execute multi-step plans yourself! If the user says: 'Open YouTube and play Believer by Imagine Dragons', naturally confirm with your voice ('Sure thing, opening YouTube and starting Believer...') and IMMEDIATELY trigger 'browserOpen' on 'https://youtube.com'. Once opened, search for the song, click on the video in the results, and command playback. You do NOT need to wait for user instructions between these steps - chain them!\n" +
-        "   - On YouTube, you can play, pause, mute, unmute, set volume, skip, toggle fullscreen. Use 'browserMediaControl' for these actions.\n" +
-        "   - On Google Search or page reading, you can search, scroll down to see more links, read heading summaries, and click links to read deep proxy webpages you fetch.\n" +
+        "7. REAL BROWSER RULE:\n" +
+        "   - For all normal browsing, opening sites, and web searches, use the system default browser only via 'openWebsite', 'searchWeb', 'searchYouTube', 'searchGoogle', and 'searchGitHub'.\n" +
+        "   - Do not open a hidden Playwright or test browser for user-facing browsing tasks.\n" +
+        "   - If a page is already open in the real browser, use desktop controls like 'clickText', 'moveMouse', 'scrollMouse', and 'pasteClipboard' for interaction.\n" +
         "8. TOOL TRIGGERS:\n" +
-        "   - Use 'browserOpen' to load any webpage, e.g. youtube.com, google.com, wikipedia.org, etc.\n" +
-        "   - Use 'browserSearch' to search inside the active search box or page.\n" +
-        "   - Use 'browserClick' to click interactive buttons, video search cells, or web anchors.\n" +
-        "   - Use 'browserMediaControl' to pause, play, scroll volume, skip, mute, or fullscreen videos.\n" +
-        "   - Use 'browserScroll' to scroll vertically.\n" +
-        "   - Use 'browserType' to write input fields.\n" +
-        "   - Use 'browserTabAction' to open, close, or focus tabs.\n" +
+        "   - Use 'openWebsite' to load any webpage in the user's real default browser, e.g. youtube.com, google.com, wikipedia.org, etc.\n" +
+        "   - Use 'searchWeb', 'searchYouTube', 'searchGoogle', and 'searchGitHub' for terminal web searches.\n" +
         "   - Use 'changeBackground' to shift your theme and 'saveCustomMemory' to memorize facts.\n" +
         "9. REAL-TIME SCREEN SHARING & MULTIMODAL SCREEN VISION SYSTEM:\n" +
         "   - You now have native, actual Multimodal Screen Vision! When the user clicks 'Share Screen', you will receive real-time, highly compressed image frames of their desktop, application window, or browser tab.\n" +
@@ -831,13 +862,14 @@ async function startServer() {
         "10. JARVIS-STYLE DESKTOP CONTROL POWERS (Local Desktop Agent):\n" +
         "   - You have full real-time control of TECH's Windows PC through your local desktop agent (a Python backend running on this machine). When the user asks you to perform an action on their computer, DO IT immediately and naturally — like a true JARVIS-class companion.\n" +
         "   - APPLICATION CONTROL: Use 'openApplication' to launch Notepad, Chrome, VS Code, Calculator, File Explorer, Task Manager, Settings, CMD, PowerShell, Paint, and more. Use 'closeApplication' to close them. Example: 'Open Notepad' -> call openApplication(name='notepad') -> respond 'Notepad opened.'\n" +
-        "   - WEBSITE & SEARCH CONTROL: Use 'openWebsite' for named sites (youtube, gmail, google, github, chatgpt) or any URL. Use 'searchWeb', 'searchYouTube', 'searchGoogle', 'searchGitHub' to open search results in the default browser. Example: 'Search YouTube for AI News' -> searchYouTube(query='AI News').\n" +
+        "   - WEBSITE & SEARCH CONTROL: Use 'openWebsite' for named sites (youtube, gmail, google, github, chatgpt) or any URL. Use 'searchWeb', 'searchYouTube', 'searchGoogle', 'searchGitHub' to open search results in the user's real default browser. Example: 'Search YouTube for AI News' -> searchYouTube(query='AI News').\n" +
         "   - FILE MANAGEMENT: Use 'createFile', 'readFile', 'renameFile', 'deleteFile' (safe Recycle Bin by default), 'moveFile', 'openFolder' (desktop/documents/downloads), 'listFiles', 'searchFiles'. Example: 'Create notes.txt on Desktop' -> createFile(path='Desktop/notes.txt'). 'Find my Python files' -> searchFiles(extension='py').\n" +
         "   - PC CONTROL: Use 'volumeUp', 'volumeDown', 'setVolume', 'muteToggle' for audio. For DANGEROUS actions (shutdown/restart/sleep/lock) you MUST use the two-step flow: first call 'requestPowerAction' to get a confirmation token, then ASK THE USER OUT LOUD to confirm (e.g. 'Are you sure you want me to shut down your PC?'). Only if they say yes, call 'executePowerAction' with the token. Never run a power action without explicit verbal confirmation.\n" +
         "   - WINDOW MANAGEMENT: Use 'minimizeWindow', 'maximizeWindow', 'closeWindow', 'switchApplication' to control the active or named window.\n" +
         "   - CLIPBOARD: Use 'copySelected' (sends Ctrl+C, reads clipboard), 'pasteClipboard' (writes + Ctrl+V), 'getClipboard', 'clearClipboard'.\n" +
-        "   - SCREENSHOT & SCREEN READING: Use 'takeScreenshot', 'saveScreenshot', 'analyzeScreenshot' (OCR of the screen), 'readScreen' (OCR of the active window + its title). Use these to answer 'What error is showing on my screen?' or 'Read the visible text'.\n" +
-        "   - DESKTOP BROWSER AUTOMATION (Playwright): Use the 'desktopBrowser*' tools to drive a REAL Chromium browser you own — open/navigate/search/click/type/fill forms/back/forward/scroll/open tab/close tab. This is separate from your holographic projector. Example: 'Fill in the login form on example.com' -> desktopBrowserOpen(url='example.com') then desktopBrowserFillForm(fields={...}).\n" +
+         "   - SCREENSHOT & SCREEN READING: Use 'takeScreenshot', 'saveScreenshot', 'analyzeScreenshot' (OCR of the screen), 'readScreen' (OCR of the active window + its title). Use these to answer 'What error is showing on my screen?' or 'Read the visible text'.\n" +
+         "   - MOUSE & CURSOR CONTROL (pyautogui): Use 'clickText' to find visible text by OCR and click its center — PREFERRED for 'click on chat named xyz in inbox', 'open chat xyz' (more reliable than guessing pixels). Use 'getMousePosition' to know cursor/screen size, 'moveMouse' for absolute pixels, 'clickMouse' for direct pixel clicks, 'doubleClickMouse', 'dragMouse', 'scrollMouse'. For pixel clicks, estimate via screen vision/takeScreenshot then moveMouse then clickMouse; for text targets use clickText(text='xyz') directly.\n" +
+        "   - For browser tasks, always launch the website in the user’s default browser and then use screen-aware desktop tools such as clickText, moveMouse, scrollMouse, and pasteClipboard for interaction. Do not open a separate test browser for normal user requests.\n" +
         "   - CODING ASSISTANCE: Use 'createPythonFile', 'writeCodeFile' (any language), 'createProjectFolder' (with subfolders), 'runPythonScript' (captures output). Example: 'Create and run a hello world Python script' -> createPythonFile then runPythonScript, then read back the output naturally.\n" +
         "   - SYSTEM INFORMATION: Use 'systemInfo' (CPU/RAM/disk/uptime), 'gpuInfo' (NVIDIA stats), 'temperatureInfo' to answer 'How is my CPU usage?' or 'What's my GPU temperature?'.\n" +
         "   - CRITICAL: Always describe what you're doing in your warm, in-character voice WHILE the tool runs. If a desktop tool returns an error (especially 'Desktop agent is not running'), gently tell TECH that the desktop control agent needs to be started (uvicorn desktop_agent.main:app --port 8765). Chain multi-step desktop plans naturally without waiting between steps.\n" +
@@ -863,134 +895,6 @@ async function startServer() {
           tools: [
             {
               functionDeclarations: [
-                {
-                  name: "browserOpen",
-                  description: "Opens a designated website URL or interface tab inside Nuvi's web agent console.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      url: {
-                        type: Type.STRING,
-                        description: "The destination website address or path, e.g. youtube.com, google.com, instagram.com, wikipedia.org."
-                      }
-                    },
-                    required: ["url"]
-                  }
-                },
-                {
-                  name: "browserSearch",
-                  description: "Enters a query search term inside the active website's search box (Google Search or YouTube Search).",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      query: {
-                        type: Type.STRING,
-                        description: "The text query term to search for."
-                      }
-                    },
-                    required: ["query"]
-                  }
-                },
-                {
-                  name: "browserClick",
-                  description: "Traces computer cursor and clicks on a target button, link, or video cell ID inside the active webpage viewport.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      selector: {
-                        type: Type.STRING,
-                        description: "The selector target ID, e.g. 'video-mWRsgZjdfQI' for a video, 'search-result-0' for Google link index, or 'play-button', 'pause-button'."
-                      },
-                      description: {
-                        type: Type.STRING,
-                        description: "A short, friendly label description of the item being clicked, e.g. 'Imagine Dragons - Believer video element'."
-                      }
-                    },
-                    required: ["selector"]
-                  }
-                },
-                {
-                  name: "browserMediaControl",
-                  description: "Controls ongoing video/audio stream media properties on YouTube, like play, pause, volume, mute, skip, and fullscreen.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      action: {
-                        type: Type.STRING,
-                        description: "The media controller command operation.",
-                        enum: ["play", "pause", "volume", "fullscreen", "exit_fullscreen", "mute", "unmute", "skip"]
-                      },
-                      value: {
-                        type: Type.INTEGER,
-                        description: "The value parameter; only relevant for set volume level, e.g. 50 for fifty percent."
-                      }
-                    },
-                    required: ["action"]
-                  }
-                },
-                {
-                  name: "browserScroll",
-                  description: "Scrolls the currently active webpage vertically up or down.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      direction: {
-                        type: Type.STRING,
-                        description: "The scroll vector movement.",
-                        enum: ["up", "down"]
-                      },
-                      amount: {
-                        type: Type.INTEGER,
-                        description: "The distance height parameter in pixels (defaults to 300)."
-                      }
-                    }
-                  }
-                },
-                {
-                  name: "browserType",
-                  description: "Enters typed letters/commands inside the active input container.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      text: {
-                        type: Type.STRING,
-                        description: "The exact letters to type in."
-                      }
-                    },
-                    required: ["text"]
-                  }
-                },
-                {
-                  name: "browserGoBack",
-                  description: "Navigates back to the previous webpage inside the current tab memory history.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {}
-                  }
-                },
-                {
-                  name: "browserTabAction",
-                  description: "Performs standard browser-tab actions: open new tab, close a tab, or switch index values.",
-                  parameters: {
-                    type: Type.OBJECT,
-                    properties: {
-                      action: {
-                        type: Type.STRING,
-                        description: "Tab action instruction.",
-                        enum: ["new", "close", "switch"]
-                      },
-                      tabId: {
-                        type: Type.STRING,
-                        description: "The tab identifier string if closing or switching."
-                      },
-                      url: {
-                        type: Type.STRING,
-                        description: "The initial starting URL if creating a new tab."
-                      }
-                    },
-                    required: ["action"]
-                  }
-                },
                 {
                   name: "changeBackground",
                   description: "Changes the visual theme or atmospheric glow color of Nuvi's interface.",
@@ -1192,56 +1096,6 @@ async function startServer() {
                   parameters: { type: Type.OBJECT, properties: { max_chars: { type: Type.INTEGER, description: "Max OCR chars (default 1500)." } } }
                 },
                 {
-                  name: "desktopBrowserOpen",
-                  description: "Open a URL in the desktop Playwright automation browser (real Chromium, separate from holographic UI).",
-                  parameters: { type: Type.OBJECT, properties: { url: { type: Type.STRING, description: "URL to open." } }, required: ["url"] }
-                },
-                {
-                  name: "desktopBrowserSearch",
-                  description: "Search within the desktop automation browser.",
-                  parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING, description: "Search query." }, engine: { type: Type.STRING, description: "Engine: google, youtube, github, duckduckgo, bing." } }, required: ["query"] }
-                },
-                {
-                  name: "desktopBrowserClick",
-                  description: "Click an element in the desktop automation browser by CSS selector or text.",
-                  parameters: { type: Type.OBJECT, properties: { selector: { type: Type.STRING, description: "CSS selector." }, text: { type: Type.STRING, description: "Text to find and click." } } }
-                },
-                {
-                  name: "desktopBrowserType",
-                  description: "Type text into the active element in the desktop automation browser.",
-                  parameters: { type: Type.OBJECT, properties: { text: { type: Type.STRING, description: "Text to type." }, selector: { type: Type.STRING, description: "Optional CSS selector for a specific input." }, clear: { type: Type.BOOLEAN, description: "Clear before typing (default true)." } }, required: ["text"] }
-                },
-                {
-                  name: "desktopBrowserFillForm",
-                  description: "Fill multiple form fields and optionally submit in the desktop automation browser.",
-                  parameters: { type: Type.OBJECT, properties: { fields: { type: Type.OBJECT, description: "Object of selector -> value pairs." }, submit: { type: Type.STRING, description: "Optional submit button selector." } }, required: ["fields"] }
-                },
-                {
-                  name: "desktopBrowserOpenTab",
-                  description: "Open a new tab in the desktop automation browser.",
-                  parameters: { type: Type.OBJECT, properties: { url: { type: Type.STRING, description: "URL for the new tab." } } }
-                },
-                {
-                  name: "desktopBrowserCloseTab",
-                  description: "Close the active tab in the desktop automation browser.",
-                  parameters: { type: Type.OBJECT, properties: {} }
-                },
-                {
-                  name: "desktopBrowserGoBack",
-                  description: "Navigate back in the desktop automation browser history.",
-                  parameters: { type: Type.OBJECT, properties: {} }
-                },
-                {
-                  name: "desktopBrowserGoForward",
-                  description: "Navigate forward in the desktop automation browser history.",
-                  parameters: { type: Type.OBJECT, properties: {} }
-                },
-                {
-                  name: "desktopBrowserScroll",
-                  description: "Scroll the desktop automation browser page.",
-                  parameters: { type: Type.OBJECT, properties: { direction: { type: Type.STRING, description: "Scroll direction: up or down." }, amount: { type: Type.INTEGER, description: "Pixels to scroll (default 500)." } } }
-                },
-                {
                   name: "createPythonFile",
                   description: "Create a Python (.py) file with content.",
                   parameters: { type: Type.OBJECT, properties: { path: { type: Type.STRING, description: "File path." }, content: { type: Type.STRING, description: "Python code content." }, overwrite: { type: Type.BOOLEAN, description: "Overwrite if exists." } }, required: ["path"] }
@@ -1323,6 +1177,91 @@ async function startServer() {
                   name: "getAutoStartStatus",
                   description: "Check whether NUVI is currently configured to auto-start on Windows login.",
                   parameters: { type: Type.OBJECT, properties: {} }
+                },
+                // --- V2: OS-level mouse / cursor control (pyautogui) ---
+                {
+                  name: "getMousePosition",
+                  description: "Get current cursor position and screen size. Use before moveMouse/clickMouse to know coordinates.",
+                  parameters: { type: Type.OBJECT, properties: {} }
+                },
+                {
+                  name: "moveMouse",
+                  description: "Move the OS cursor to absolute screen pixels. Use when user says 'move cursor to X Y' or 'move mouse to 500 300'.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      x: { type: Type.NUMBER, description: "Target X pixel (0 .. screen width)." },
+                      y: { type: Type.NUMBER, description: "Target Y pixel (0 .. screen height)." },
+                      duration: { type: Type.NUMBER, description: "Animation duration seconds (default 0.2)." }
+                    },
+                    required: ["x", "y"]
+                  }
+                },
+                {
+                  name: "clickMouse",
+                  description: "Click at screen pixels or current cursor. Use for 'click', 'click at 400 300', 'right click'.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      x: { type: Type.NUMBER, description: "X pixel (optional, defaults to current)." },
+                      y: { type: Type.NUMBER, description: "Y pixel (optional)." },
+                      button: { type: Type.STRING, description: "left, right, or middle (default left).", enum: ["left", "right", "middle"] },
+                      clicks: { type: Type.NUMBER, description: "Number of clicks 1-3 (default 1)." },
+                      interval: { type: Type.NUMBER, description: "Interval between clicks seconds (default 0.1)." }
+                    }
+                  }
+                },
+                {
+                  name: "doubleClickMouse",
+                  description: "Double-click at coordinates or current cursor. Use when user says 'double click'.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      x: { type: Type.NUMBER, description: "X pixel (optional)." },
+                      y: { type: Type.NUMBER, description: "Y pixel (optional)." },
+                      button: { type: Type.STRING, description: "Button (default left).", enum: ["left", "right", "middle"] }
+                    }
+                  }
+                },
+                {
+                  name: "dragMouse",
+                  description: "Drag from current cursor to target pixels. Use for 'drag to 800 400'.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      x: { type: Type.NUMBER, description: "Target X." },
+                      y: { type: Type.NUMBER, description: "Target Y." },
+                      duration: { type: Type.NUMBER, description: "Duration seconds (default 0.4)." },
+                      button: { type: Type.STRING, description: "Button to hold (default left).", enum: ["left", "right", "middle"] }
+                    },
+                    required: ["x", "y"]
+                  }
+                },
+                {
+                  name: "scrollMouse",
+                  description: "Scroll the OS at cursor or at X,Y. Use for 'scroll down' outside the browser.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      direction: { type: Type.STRING, description: "up or down (default down).", enum: ["up", "down"] },
+                      amount: { type: Type.NUMBER, description: "Pixels to scroll, 100 ~ 1 notch (default 300)." },
+                      x: { type: Type.NUMBER, description: "Optional X to move before scrolling." },
+                      y: { type: Type.NUMBER, description: "Optional Y." }
+                    }
+                  }
+                },
+                {
+                  name: "clickText",
+                  description: "Find visible text on screen via OCR and click its center. Use for 'click on chat named xyz in inbox', 'open chat xyz'. More reliable than guessing coordinates.",
+                  parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING, description: "Visible label to click, e.g. 'xyz'." },
+                      button: { type: Type.STRING, description: "Button left/right/middle (default left).", enum: ["left", "right", "middle"] },
+                      clicks: { type: Type.NUMBER, description: "Clicks 1-3 (default 1)." }
+                    },
+                    required: ["text"]
+                  }
                 }
               ]
             }
@@ -1423,40 +1362,46 @@ async function startServer() {
                       console.error("saveCustomMemory execution failure:", err);
                     }
                   })();
-                } else if (DESKTOP_TOOLS.has(fc.name!)) {
-                  // ── Desktop control tools: route to Python agent ──
-                  (async () => {
-                    console.log(`[Desktop Agent] Routing ${fc.name} to Python backend...`);
-                    const agentResult = await callDesktopAgent(fc.name!, fc.args as Record<string, unknown>);
-
-                    if (agentResult.ok) {
-                      const output = agentResult.result ?? { result: "Done." };
-                      session.sendToolResponse({
-                        functionResponses: [{
-                          name: fc.name,
-                          response: { output },
-                          id: fc.id!
-                        }]
-                      });
-                    } else {
-                      const errMsg = agentResult.error || "Desktop agent error.";
-                      console.error(`[Desktop Agent] Error for ${fc.name}:`, errMsg);
-                      session.sendToolResponse({
-                        functionResponses: [{
-                          name: fc.name,
-                          response: { output: { result: `Desktop control error: ${errMsg}` } },
-                          id: fc.id!
-                        }]
-                      });
-                    }
-                  })();
                 } else {
-                  clientWs.send(JSON.stringify({
-                    type: "toolCall",
-                    callId: fc.id!,
-                    name: fc.name,
-                    args: fc.args
-                  }));
+                  const mapped = mapToRealDesktopTool(String(fc.name || ""), (fc.args as Record<string, unknown>) || {});
+                  const realName = mapped ? mapped.name : fc.name;
+                  const realArgs = mapped ? mapped.args : (fc.args as Record<string, unknown>);
+
+                  if (DESKTOP_TOOLS.has(String(realName))) {
+                    // ── Desktop control tools: route to Python agent ──
+                    (async () => {
+                      console.log(`[Desktop Agent] Routing ${realName} to Python backend...`);
+                      const agentResult = await callDesktopAgent(String(realName), realArgs as Record<string, unknown>);
+
+                      if (agentResult.ok) {
+                        const output = agentResult.result ?? { result: "Done." };
+                        session.sendToolResponse({
+                          functionResponses: [{
+                            name: fc.name,
+                            response: { output },
+                            id: fc.id!
+                          }]
+                        });
+                      } else {
+                        const errMsg = agentResult.error || "Desktop agent error.";
+                        console.error(`[Desktop Agent] Error for ${realName}:`, errMsg);
+                        session.sendToolResponse({
+                          functionResponses: [{
+                            name: fc.name,
+                            response: { output: { result: `Desktop control error: ${errMsg}` } },
+                            id: fc.id!
+                          }]
+                        });
+                      }
+                    })();
+                  } else {
+                    clientWs.send(JSON.stringify({
+                      type: "toolCall",
+                      callId: fc.id!,
+                      name: fc.name,
+                      args: fc.args
+                    }));
+                  }
                 }
               }
             }
