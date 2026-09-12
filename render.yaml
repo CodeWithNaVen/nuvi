@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: nuvi-server
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://nuviai.vercel.app
+      - key: VITE_FRONTEND_URL
+        value: https://nuviai.vercel.app
+      # set GEMINI_API_KEY in Render dashboard as secret
