@@ -1,15 +1,8 @@
 {
   "version": 2,
   "name": "nuvi-backend",
-  "outputDirectory": ".",
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "server*.ts",
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+  "routes": [
+    { "src": "/(.*)", "dest": "/api/index" }
   ],
   "env": {
     "VITE_FRONTEND_URL": "https://nuviai.vercel.app",
