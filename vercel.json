@@ -5,11 +5,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://nuvi-server.vercel.app/api/$1"
+      "destination": "https://nuvi.onrender.com/api/$1"
     },
     {
       "source": "/live",
-      "destination": "https://nuvi-server.vercel.app/live"
+      "destination": "https://nuvi.onrender.com/live"
     }
   ]
 }
