@@ -54,7 +54,7 @@
     "productName": "Nuvi",
     "directories": { "output": "release", "buildResources": "assets" },
     "files": ["dist/**/*", "electron/**/*", "assets/**/*", "public/**/*", "package.json"],
-    "extraResources": [{ "from": "build/icon.ico", "to": "icon.ico" }],
+    "extraResources": [{ "from": "build/icon.ico", "to": "icon.ico" }, { "from": "agent_dist/nuvi-agent.exe", "to": "agent/nuvi-agent.exe" }],
     "win": { "target": ["nsis", "portable"], "icon": "assets/icon.ico" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }

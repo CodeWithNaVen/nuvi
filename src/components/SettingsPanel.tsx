@@ -106,9 +106,10 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
         const data = await res.json();
         setAgentHealth({ online: true, toolCount: data.tool_count });
       } catch {
-        // Cross-origin may fail; try the server proxy as a fallback.
+        // Cross-origin may fail; try the server proxy (Vercel or same-origin) as fallback.
         try {
-          const res2 = await fetch("/api/agent-health", { cache: "no-store" });
+          const { apiUrl } = await import("../lib/config");
+          const res2 = await fetch(apiUrl("/api/agent-health"), { cache: "no-store" });
           if (res2.ok) {
             const d = await res2.json();
             setAgentHealth({ online: !!d.online, toolCount: d.tool_count });
@@ -230,11 +231,13 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       onChange({ autoStart: v });
                       // Persist + push to backend; the desktop agent flips the
                       // HKCU Run registry key. We just record intent here.
-                      void fetch("/api/settings", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ autoStart: v }),
-                      }).catch(() => {});
+                      void import("../lib/config").then(({ apiUrl }) =>
+                        fetch(apiUrl("/api/settings"), {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ autoStart: v }),
+                        }).catch(() => {})
+                      );
                     }}
                   />
 

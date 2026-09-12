@@ -100,6 +100,32 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return base64ArrayBuffer(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
 }
 
+function rmsFloat32(data: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+  return Math.sqrt(sum / (data.length || 1));
+}
+
+function rmsInt16(int16: Int16Array): number {
+  let sum = 0;
+  for (let i = 0; i < int16.length; i++) {
+    const v = int16[i] / 32768;
+    sum += v * v;
+  }
+  return Math.sqrt(sum / (int16.length || 1));
+}
+
+function analyserEnergy(analyser: AnalyserNode | null): number {
+  if (!analyser) return 0;
+  try {
+    const arr = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(arr);
+    let sum = 0;
+    for (let i = 0; i < arr.length; i++) sum += arr[i];
+    return sum / arr.length / 255;
+  } catch { return 0; }
+}
+
 export class NuviAudioSession {
   private ws: WebSocket | null = null;
   private inputAudioCtx: AudioContext | null = null;
@@ -130,6 +156,12 @@ export class NuviAudioSession {
   private nativePlaylist: any = null;
   private nativePlaylistUris: string[] = [];
   private nativePlaylistStarting = false;
+  private suppressPlaybackUntil = 0;
+  // Barge-in echo-cancellation gating — prevents assistant's own speaker echo
+  // from triggering Gemini's interruption while still allowing a loud user voice to cut in.
+  private bargeInStreak = 0;
+  private lastSpeakingStartMs = 0;
+  private lastOutputEnergy = 0;
 
   private serverUrl: string;
 
@@ -164,7 +196,59 @@ export class NuviAudioSession {
   getState(): LiveState { return this.currentState; }
 
   private canCaptureMic(): boolean {
-    return this.isActivated && this.currentState !== 'disconnected' && this.currentState !== 'connecting' && this.currentState !== 'speaking';
+    // Allow capture while speaking so Gemini can detect barge-in and send `interrupted`.
+    // Mirrors desktop `src/lib/audio.ts:203` which only blocks disconnected/connecting.
+    // Actual echo filtering is done inside onaudioprocess/onBuffer during speaking.
+    return this.isActivated && this.currentState !== 'disconnected' && this.currentState !== 'connecting';
+  }
+
+  /** Returns true if input RMS is loud enough to be a real user barge-in (not speaker echo). */
+  private isBargeInLoud(inputRms: number, outputEnergy: number): boolean {
+    if (this.currentState !== 'speaking') return true;
+    // Grace period: first 600ms after assistant starts, echo onset is strongest — require very loud.
+    const sinceSpeaking = Date.now() - this.lastSpeakingStartMs;
+    const graceFactor = sinceSpeaking < 600 ? 1.9 : 1.0;
+    // Stricter floor: phone speaker echo at max volume ~0.06-0.09 RMS even with AEC; user close-talk ~0.14-0.28 RMS.
+    // Require absolute floor 0.11 (0.21 in grace) and input > output*1.8 to pass.
+    const absFloor = 0.11 * graceFactor;
+    if (inputRms < absFloor) return false;
+    if (outputEnergy > 0.035 && inputRms < outputEnergy * 1.85 * graceFactor) return false;
+    return true;
+  }
+
+  private noteBargeInAttempt(isLoud: boolean): boolean {
+    if (this.currentState !== 'speaking') { this.bargeInStreak = 0; return true; }
+    if (isLoud) {
+      this.bargeInStreak = Math.min(8, this.bargeInStreak + 1);
+      // Require 3 consecutive loud frames (~90-180ms) to confirm human, rejects transient echo and autoGain pops.
+      return this.bargeInStreak >= 3;
+    } else {
+      this.bargeInStreak = Math.max(0, this.bargeInStreak - 2);
+      return false;
+    }
+  }
+
+  /** Called when loud barge-in detected: stop TTS and prime mic for user. Returns true if barge-in consumed. */
+  private tryBargeIn(): boolean {
+    if (this.currentState !== 'speaking') return false;
+    // Half-duplex: stop current speech first, don't forward the triggering chunk (it contains echo).
+    // Next chunks after ~120ms will be pure user voice.
+    this.suppressPlaybackUntil = Date.now() + 350; // brief suppression to drain echo tail
+    this.handleInterruption();
+    // Add small delay before next mic chunks are forwarded so echo tail decays.
+    this.lastSpeakingStartMs = 0; // reset grace
+    return true;
+  }
+
+  /** Public barge-in: stop current playback and return to listening without disconnecting. */
+  public interrupt(): void {
+    if (this.currentState !== 'speaking') return;
+    // Suppress model audio for a short window so tap alone feels like a stop
+    // and doesn't immediately resume from buffered Gemini chunks. Voice barge-in
+    // via `canCaptureMic` will still send mic audio and trigger server `interrupted`.
+    this.suppressPlaybackUntil = Date.now() + 1200;
+    this.bargeInStreak = 0;
+    this.handleInterruption();
   }
 
   public sendVideoFrame(b64: string) {
@@ -244,7 +328,7 @@ export class NuviAudioSession {
             this.outputGainNode.connect(this.outputAnalyser);
             this.outputAnalyser.connect(this.outputAudioCtx.destination);
             const stream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false },
             });
             if (!this.isActivated || !this.inputAudioCtx || !this.outputAudioCtx) {
               stream.getTracks().forEach(t => t.stop());
@@ -260,6 +344,9 @@ export class NuviAudioSession {
             this.micProcessorNode.connect(this.inputAudioCtx.destination);
             this.micProcessorNode.onaudioprocess = e => {
               if (!this.canCaptureMic()) return;
+              // Pure half-duplex while speaking: never forward mic (eliminates acoustic echo self-interrupt).
+              // Tap orb/power to interrupt (interrupt()), then mic resumes in listening state.
+              if (this.currentState === 'speaking') return;
               const channelData = e.inputBuffer.getChannelData(0);
               const pcmBuffer = floatTo16BitPCM(channelData);
               const b64 = base64ArrayBuffer(pcmBuffer);
@@ -323,6 +410,8 @@ export class NuviAudioSession {
   }
 
   private handleInterruption() {
+    this.bargeInStreak = 0;
+    this.lastOutputEnergy = 0;
     this.activeSources.forEach(s => { try { s.stop(); } catch {} });
     this.activeSources = [];
     this.nextStartTime = 0;
@@ -349,6 +438,17 @@ export class NuviAudioSession {
   }
 
   private async playNativeChunk(b64: string) {
+    if (Date.now() < this.suppressPlaybackUntil) return;
+    if (this.currentState !== 'speaking') {
+      this.lastSpeakingStartMs = Date.now();
+      this.bargeInStreak = 0;
+    }
+    // Estimate output energy from PCM so native barge-in gate has a reference (no analyser on native).
+    try {
+      const tmp = base64ToUint8Array(b64);
+      const int16 = new Int16Array(tmp.buffer, tmp.byteOffset, tmp.byteLength / 2);
+      this.lastOutputEnergy = rmsInt16(int16);
+    } catch {}
     this.setState('speaking');
     try {
       const pcmBytes = base64ToUint8Array(b64);
@@ -572,6 +672,7 @@ export class NuviAudioSession {
   }
 
   private playAudioPCMChunk(b64: string) {
+    if (Date.now() < this.suppressPlaybackUntil) return;
     // Native path: no Web Audio, use expo-audio wav file
     if (Platform.OS !== 'web') {
       void this.playNativeChunk(b64);
@@ -582,6 +683,12 @@ export class NuviAudioSession {
       return;
     }
     try {
+      if (this.currentState !== 'speaking') {
+        this.lastSpeakingStartMs = Date.now();
+        this.bargeInStreak = 0;
+      }
+      // Update output energy for echo comparison (web analyser will be primary, but keep RMS fallback).
+      try { const t = base64ToUint8Array(b64); this.lastOutputEnergy = rmsInt16(new Int16Array(t.buffer, t.byteOffset, t.byteLength/2)); } catch {}
       this.setState('speaking');
       const uint8 = base64ToUint8Array(b64);
       const floats = pcm16ToFloats(uint8);
@@ -661,6 +768,8 @@ export class NuviAudioSession {
           try {
             const data: ArrayBuffer = buf?.data || buf;
             if (!data || (data as any).byteLength < 400) return; // skip tiny
+            // Pure half-duplex while speaking: drop mic, tap to interrupt
+            if (this.currentState === 'speaking') return;
             const b64 = base64ArrayBuffer(data as ArrayBuffer);
             this.ws?.send(JSON.stringify({ audio: b64 }));
             console.log('[Nuvi Mic] stream chunk', (data as any).byteLength, 'b64', b64.length);
@@ -714,8 +823,13 @@ export class NuviAudioSession {
                   const isWav = all.length > 12 && all[0] === 82 && all[1] === 73 && all[2] === 70 && all[3] === 70;
                   const pcm = isWav && all.length > 44 ? all.slice(44) : all;
                   if (pcm.length > 800) {
-                    this.ws?.send(JSON.stringify({ audio: uint8ToBase64(pcm as Uint8Array) }));
-                    sent = true;
+                    if (this.currentState === 'speaking') {
+                      // half-duplex: never stream while speaking (tap to interrupt)
+                      sent = false;
+                    } else {
+                      this.ws?.send(JSON.stringify({ audio: uint8ToBase64(pcm as Uint8Array) }));
+                      sent = true;
+                    }
                   }
                 }
               } catch {}
@@ -727,7 +841,13 @@ export class NuviAudioSession {
                     const all = base64ToUint8Array(b64);
                     const isWav = all.length > 12 && all[0] === 82 && all[1] === 73 && all[2] === 70 && all[3] === 70;
                     const pcm = isWav && all.length > 44 ? all.slice(44) : all;
-                    if (pcm.length > 800) this.ws?.send(JSON.stringify({ audio: uint8ToBase64(pcm as Uint8Array) }));
+                    if (pcm.length > 800) {
+                      if (this.currentState === 'speaking') {
+                        // half-duplex: drop
+                      } else {
+                        this.ws?.send(JSON.stringify({ audio: uint8ToBase64(pcm as Uint8Array) }));
+                      }
+                    }
                   }
                 } catch {}
               }

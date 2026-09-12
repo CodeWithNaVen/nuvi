@@ -191,10 +191,21 @@ export default function Page() {
   const handleToggleConnection = async () => {
     setErrorText(null);
     if (!sessionRef.current) return;
+    // If Nuvi is speaking, power button acts as barge-in (tap to interrupt) without disconnecting.
+    if (liveState === 'speaking') {
+      try { (sessionRef.current as any).interrupt?.(); } catch {}
+      return;
+    }
     // update serverUrl if changed
     sessionRef.current.updateServerUrl(serverUrl);
     if (liveState === 'disconnected') await sessionRef.current.connect();
     else sessionRef.current.disconnect();
+  };
+
+  const handleInterrupt = () => {
+    if (liveState === 'speaking' && sessionRef.current) {
+      try { (sessionRef.current as any).interrupt?.(); } catch {}
+    }
   };
 
   const runCameraAnalysis = async (mode: 'analyze' | 'ocr') => {
@@ -289,9 +300,17 @@ export default function Page() {
         </View>
       </View>
 
-      {/* Orb Stage */}
+      {/* Orb Stage — tap to interrupt while speaking, tap to connect when idle */}
       <View style={styles.stage}>
-        <NuviOrb state={orbState} amplitude={amp} size={240} />
+        <Pressable
+          onPress={() => {
+            if (liveState === 'speaking') handleInterrupt();
+            else if (liveState === 'disconnected') handleToggleConnection();
+          }}
+          style={{ alignItems: 'center', justifyContent: 'center' }}
+        >
+          <NuviOrb state={orbState} amplitude={amp} size={240} />
+        </Pressable>
         <View style={styles.captionBox}>
           {modelCaption || userCaption ? (
             <Text style={[styles.caption, userCaption ? styles.userCaption : styles.modelCaption]}>

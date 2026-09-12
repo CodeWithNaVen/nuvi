@@ -24,7 +24,8 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/config", { cache: "no-store" });
+        const { apiUrl } = await import("../lib/config");
+        const res = await fetch(apiUrl("/api/config"), { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
         setPhase(data.hasApiKey ? "ready" : "needsKey");
@@ -45,7 +46,8 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/config/apikey", {
+      const { apiUrl } = await import("../lib/config");
+      const res = await fetch(apiUrl("/api/config/apikey"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: key }),

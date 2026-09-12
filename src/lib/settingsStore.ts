@@ -82,7 +82,8 @@ export function saveSettings(patch: Partial<NuviSettings>): NuviSettings {
 /** Push settings to the backend (server.ts persists to settings.json). */
 async function syncSettingsToBackend(settings: NuviSettings): Promise<void> {
   try {
-    await fetch("/api/settings", {
+    const { apiUrl } = await import("./config");
+    await fetch(apiUrl("/api/settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),

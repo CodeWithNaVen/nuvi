@@ -6,6 +6,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { Memory, MemoryCategory } from "./lib/memoryTypes";
 import { NuviSettings, DEFAULT_SETTINGS, loadSettings, saveSettings } from "./lib/settingsStore";
 import { NuviWakeWordDetector } from "./lib/wakeWord";
+import { apiUrl } from "./lib/config";
 import {
   Power,
   Mic,
@@ -162,9 +163,9 @@ export default function App() {
     setChatMessages((prev) => [...prev, { id: Math.random().toString(36).slice(2, 8), role, text }]);
   };
 
-  // Fetch memories
+  // Fetch memories (uses VITE_BACKEND_URL when deployed)
   useEffect(() => {
-    fetch("/api/memories")
+    fetch(apiUrl("/api/memories"))
       .then((r) => r.json())
       .then((d) => { if (Array.isArray(d)) setMemories(d); })
       .catch(() => {});
@@ -172,7 +173,7 @@ export default function App() {
 
   const handleAddMemory = async (category: MemoryCategory, text: string) => {
     try {
-      const res = await fetch("/api/memories", {
+      const res = await fetch(apiUrl("/api/memories"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category, text }),
@@ -183,7 +184,7 @@ export default function App() {
   };
   const handleDeleteMemory = async (id: string) => {
     try {
-      await fetch(`/api/memories/${id}`, { method: "DELETE" });
+      await fetch(apiUrl(`/api/memories/${id}`), { method: "DELETE" });
       setMemories((prev) => prev.filter((m) => m.id !== id));
     } catch (e) { console.error(e); }
   };
@@ -388,11 +389,11 @@ export default function App() {
       if (browserB64) {
         args.image_base64 = browserB64;
       }
-      // Use same-origin proxy so web and Electron both work (direct 127.0.0.1 fails in web/CORS)
+      // Use backend URL (Vercel or same-origin) — falls back to direct agent in Electron
       let response: Response | null = null;
       let data: any = null;
       try {
-        response = await fetch("/api/desktop/execute", {
+        response = await fetch(apiUrl("/api/desktop/execute"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tool, args }),
@@ -486,11 +487,11 @@ export default function App() {
               }
               const fwdArgs: Record<string, any> = { ...(args || {}) };
               if (b64) fwdArgs.image_base64 = b64;
-              // Prefer same-origin proxy (works in web + Electron)
+              // Prefer backend URL (Vercel or same-origin), fallback to direct agent
               let res: Response | null = null;
               let data: any = null;
               try {
-                res = await fetch("/api/desktop/execute", {
+                res = await fetch(apiUrl("/api/desktop/execute"), {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ tool: name, args: fwdArgs }),

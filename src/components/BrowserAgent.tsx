@@ -25,6 +25,7 @@ import {
   BookOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { apiUrl } from "../lib/config";
 
 interface LogItem {
   id: string;
@@ -194,7 +195,7 @@ export const BrowserAgent: React.FC<BrowserAgentProps> = ({
           const urlObj = new URL(activeTab.url);
           const q = urlObj.searchParams.get("search_query") || "";
           
-          fetch(`/api/youtube-search?q=${encodeURIComponent(q)}`)
+          fetch(apiUrl(`/api/youtube-search?q=${encodeURIComponent(q)}`))
             .then(res => {
               if (!res.ok) throw new Error(`HTTP status ${res.status}`);
               return res.json();
@@ -605,7 +606,7 @@ export const BrowserAgent: React.FC<BrowserAgentProps> = ({
       return "about:blank";
     }
 
-    return `/api/web-proxy?url=${encodeURIComponent(urlStr)}`;
+    return apiUrl(`/api/web-proxy?url=${encodeURIComponent(urlStr)}`);
   };
 
   // Trigger when proxy finishes loading iframe
