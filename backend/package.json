@@ -12,6 +12,7 @@
     "@google/genai": "^2.4.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "vite": "^6.2.3",
     "ws": "^8.21.0"
   },
   "devDependencies": {
