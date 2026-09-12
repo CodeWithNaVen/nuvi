@@ -1,0 +1,10 @@
+node_modules
+dist
+logs
+*.log
+.git
+.gitignore
+.env
+secrets.json
+memories.json
+settings.json

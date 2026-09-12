@@ -99,3 +99,12 @@ npm run dist     # electron-builder -> release/
 - `NO_API_KEY` → add key in gate or `.env`
 - Screen share `Not Supported` on desktop → fixed via `setDisplayMediaRequestHandler`; reload with `npm run app`
 - `chunked_data_pipe ... Error -2` on WS close → harmless Chromium log
+
+
+fly launch --name nuvi-server --region bom --no-db # use existing if created, skip when app exists
+fly secrets set GEMINI_API_KEY="AIza..." FRONTEND_URL="https://nuviai.vercel.app" VITE_FRONTEND_URL="https://nuviai.vercel.app"
+fly deploy # builds backend/Dockerfile -> https://nuvi-server.fly.dev
+fly logs
+# test
+curl https://nuvi-server.fly.dev/health # {"status":"ok"...}
+curl https://nuvi-server.fly.dev/ # fixed by ca58c80

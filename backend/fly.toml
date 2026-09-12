@@ -1,0 +1,41 @@
+app = "nuvi-server"
+primary_region = "bom"  # close to your Vercel bom1; change to iad/sin if needed
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  FRONTEND_URL = "https://nuviai.vercel.app"
+  VITE_FRONTEND_URL = "https://nuviai.vercel.app"
+  # GEMINI_API_KEY is set via `fly secrets set` (not here)
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[services.ports]]
+  port = 80
+  handlers = ["http"]
+[[services.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+# Optional: persistent volume for /data (secrets.json, memories.json, logs)
+# Uncomment after `fly volumes create nuvi_data --region bom --size 1`
+# [[mounts]]
+#   source = "nuvi_data"
+#   destination = "/data"
+# And then set NUVI_DATA_DIR=/data via `fly secrets set NUVI_DATA_DIR=/data`
