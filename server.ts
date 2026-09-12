@@ -280,16 +280,28 @@ async function callDesktopAgent(
   }
 }
 
-async function startServer() {
+export async function createApp() {
   const app = express();
-  const PORT = 3000;
-  
   app.use(express.json());
-  // CORS for mobile (Expo Go / web on different port) and localhost dev
+  // CORS — allow Vercel frontend + local dev + mobile
+  const ALLOWED_ORIGINS = [
+    "https://nuvi.vercel.app",
+    "https://nuvi-server.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    process.env.FRONTEND_URL || "",
+    process.env.VITE_FRONTEND_URL || "",
+  ].filter(Boolean);
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const origin = req.headers.origin as string | undefined;
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app")) {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+    } else {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
     res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
   });
@@ -1528,37 +1540,57 @@ async function startServer() {
     }
   });
 
+  // Health check for Vercel
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", version: "1.0.0", backend: "https://nuvi-server.vercel.app" });
+  });
+
   // Serve custom static assets folder
   app.use("/assets", express.static(path.join(process.cwd(), "assets")));
 
-  // Express Static assets / Vite Dev Middleware configuration
-  if (process.env.NODE_ENV !== "production") {
-    // Loaded lazily so the production bundle never requires vite (a dev-only
-    // dependency that is not shipped with the packaged app).
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  // Express Static assets / Vite Dev Middleware — skip on Vercel (frontend is separate)
+  const isVercel = !!process.env.VERCEL;
+  if (!isVercel) {
+    if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (req, res, next) => {
+          // Skip API/WS routes
+          if (req.path.startsWith("/api") || req.path === "/live" || req.path === "/health") return next();
+          res.sendFile(path.join(distPath, 'index.html'));
+        });
+      }
+    }
   }
 
+  return { app, server, wss };
+}
+
+async function startServer() {
+  const PORT = parseInt(process.env.PORT || process.env.NUVI_PORT || "3000", 10);
+  const { app, server } = await createApp();
   server.listen(PORT, "0.0.0.0", () => {
     logStartup(`NUVI V2 server started on http://localhost:${PORT}`);
     console.log(`[Server] Running on http://localhost:${PORT}`);
-    // Kick off the desktop agent (probe + auto-spawn) immediately on boot.
-    ensureDesktopAgent().catch((e) =>
-      console.warn(`[Desktop Agent] Boot probe failed: ${e?.message || e}`)
-    );
+    if (!process.env.VERCEL) {
+      ensureDesktopAgent().catch((e) =>
+        console.warn(`[Desktop Agent] Boot probe failed: ${e?.message || e}`)
+      );
+    }
   });
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start server startup sequence:", error);
-});
+// Only auto-start when not imported by Vercel serverless handler
+if (!process.env.VERCEL) {
+  startServer().catch((error) => {
+    console.error("Failed to start server startup sequence:", error);
+  });
+}

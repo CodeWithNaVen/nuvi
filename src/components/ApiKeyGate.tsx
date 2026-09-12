@@ -11,6 +11,7 @@
 
 import { useEffect, useState, type ReactNode, type FormEvent } from "react";
 import { KeyRound, Loader2, ExternalLink, ShieldCheck } from "lucide-react";
+import { apiUrl } from "../lib/config";
 
 type Phase = "checking" | "needsKey" | "ready";
 
@@ -24,7 +25,6 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const { apiUrl } = await import("../lib/config");
         const res = await fetch(apiUrl("/api/config"), { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
@@ -46,7 +46,6 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
     setSubmitting(true);
     setError(null);
     try {
-      const { apiUrl } = await import("../lib/config");
       const res = await fetch(apiUrl("/api/config/apikey"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },

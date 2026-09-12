@@ -25,6 +25,8 @@ export interface NuviSettings {
   animations: boolean;
 }
 
+import { apiUrl } from "./config";
+
 export const DEFAULT_SETTINGS: NuviSettings = {
   autoStart: false,
   wakeWordEnabled: false,
@@ -82,7 +84,6 @@ export function saveSettings(patch: Partial<NuviSettings>): NuviSettings {
 /** Push settings to the backend (server.ts persists to settings.json). */
 async function syncSettingsToBackend(settings: NuviSettings): Promise<void> {
   try {
-    const { apiUrl } = await import("./config");
     await fetch(apiUrl("/api/settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },

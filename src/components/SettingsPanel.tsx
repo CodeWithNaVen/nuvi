@@ -18,6 +18,7 @@ import {
   loadSettings,
   saveSettings,
 } from "../lib/settingsStore";
+import { apiUrl } from "../lib/config";
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -108,7 +109,6 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
       } catch {
         // Cross-origin may fail; try the server proxy (Vercel or same-origin) as fallback.
         try {
-          const { apiUrl } = await import("../lib/config");
           const res2 = await fetch(apiUrl("/api/agent-health"), { cache: "no-store" });
           if (res2.ok) {
             const d = await res2.json();
@@ -231,13 +231,11 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       onChange({ autoStart: v });
                       // Persist + push to backend; the desktop agent flips the
                       // HKCU Run registry key. We just record intent here.
-                      void import("../lib/config").then(({ apiUrl }) =>
-                        fetch(apiUrl("/api/settings"), {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ autoStart: v }),
-                        }).catch(() => {})
-                      );
+                      void fetch(apiUrl("/api/settings"), {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ autoStart: v }),
+                      }).catch(() => {});
                     }}
                   />
 

@@ -9,6 +9,8 @@
  * - Input & Output AnalyserNodes for real-time waveform visuals.
  */
 
+import { wsUrl } from "./config";
+
 export type LiveState = "disconnected" | "connecting" | "listening" | "speaking";
 
 // PCM Conversion Helper: converts Float32Array [-1.0, 1.0] to signed Int16 Raw PCM Little Endian
@@ -131,7 +133,6 @@ export class NuviAudioSession {
     try {
       // 1. Establish custom WebSocket server bridge
       // Uses VITE_BACKEND_URL when deployed (https://nuvi-server.vercel.app), else same-origin
-      const { wsUrl } = await import("./config");
       this.ws = new WebSocket(wsUrl("/live"));
       this.ws.binaryType = "blob";
 
