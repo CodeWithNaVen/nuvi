@@ -306,17 +306,6 @@ export async function createApp() {
     next();
   });
 
-  // Simple root response for Vercel/serverless health checks and landing page requests.
-  app.get("/", (_req, res) => {
-    res.json({
-      status: "ok",
-      service: "nuvi-backend",
-      health: "/health",
-      api: "/api",
-      version: "1.0.0",
-    });
-  });
-
   // Memory REST API Endpoints
   app.get("/api/memories", async (req, res) => {
     try {
@@ -1551,10 +1540,15 @@ export async function createApp() {
     }
   });
 
-  // Health check for Vercel
+  // Health check (always) + Vercel-only root JSON (must not shadow Vite SPA locally)
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", version: "1.0.0", backend: "https://nuvi.onrender.com" });
   });
+  if (!!process.env.VERCEL || process.env.RENDER) {
+    app.get("/", (_req, res) => {
+      res.json({ status: "ok", service: "nuvi-backend", health: "/health", api: "/api", version: "1.0.0" });
+    });
+  }
 
   // Serve custom static assets folder
   app.use("/assets", express.static(path.join(process.cwd(), "assets")));
