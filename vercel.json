@@ -1,6 +1,7 @@
 {
   "version": 2,
   "name": "nuvi-server",
+  "buildCommand": "echo 'server: skipping vite build - api only'",
   "functions": {
     "api/index.ts": {
       "includeFiles": "server*.ts",
