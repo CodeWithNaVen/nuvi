@@ -132,7 +132,7 @@ export class NuviAudioSession {
 
     try {
       // 1. Establish custom WebSocket server bridge
-      // Uses VITE_BACKEND_URL when deployed (https://nuvi-server.vercel.app), else same-origin
+      // Uses VITE_BACKEND_URL when deployed (https://nuvi.onrender.com), else same-origin
       this.ws = new WebSocket(wsUrl("/live"));
       this.ws.binaryType = "blob";
 

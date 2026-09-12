@@ -1,6 +1,6 @@
 /**
  * Vercel Serverless entry for NUVI backend.
- * Deployed as https://nuvi-server.vercel.app
+ * Deployed as https://nuvi.onrender.com
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 

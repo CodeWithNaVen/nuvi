@@ -286,7 +286,7 @@ export async function createApp() {
   // CORS — allow Vercel frontend + local dev + mobile
   const ALLOWED_ORIGINS = [
     "https://nuviai.vercel.app",
-    "https://nuvi-server.vercel.app",
+    "https://nuvi.onrender.com",
     "http://localhost:3000",
     "http://localhost:5173",
     process.env.FRONTEND_URL || "",
@@ -1553,7 +1553,7 @@ export async function createApp() {
 
   // Health check for Vercel
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", version: "1.0.0", backend: "https://nuvi-server.vercel.app" });
+    res.json({ status: "ok", version: "1.0.0", backend: "https://nuvi.onrender.com" });
   });
 
   // Serve custom static assets folder

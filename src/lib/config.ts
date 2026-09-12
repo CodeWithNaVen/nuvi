@@ -3,7 +3,7 @@
  *
  * Supports split Vercel deployments:
  *  - https://nuviai.vercel.app (frontend)
- *  - https://nuvi-server.vercel.app (backend + agents + WS)
+ *  - https://nuvi.onrender.com (backend + agents + WS)
  *
  * VITE_BACKEND_URL is injected at build time via Vite. Falls back to
  * same-origin (empty string) for local dev / Electron (localhost:3000).
