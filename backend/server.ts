@@ -11,15 +11,15 @@ import {
   saveMemories, 
   formatSystemInstructionsWithMemories, 
   processConversationSlice 
-} from "./server_memory";
-import { Memory } from "./src/lib/memoryTypes";
+} from "./server_memory.js";
+import { Memory } from "./src/lib/memoryTypes.js";
 import {
   DATA_DIR,
   dataFile,
   getGeminiApiKey,
   hasGeminiApiKey,
   setGeminiApiKey,
-} from "./server_paths";
+} from "./server_paths.js";
 
 dotenv.config();
 
