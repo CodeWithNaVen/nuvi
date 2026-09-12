@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: nuvi-server
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore # closest to Nepal: singapore/mumbai; Render auto
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000 # Render sets PORT=10000, server.ts reads process.env.PORT
+      - key: FRONTEND_URL
+        value: https://nuviai.vercel.app
+      - key: VITE_FRONTEND_URL
+        value: https://nuviai.vercel.app
+      # GEMINI_API_KEY MUST be set via Render Dashboard (never commit)
+      # - key: GEMINI_API_KEY
+      #   sync: false
