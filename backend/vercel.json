@@ -1,6 +1,7 @@
 {
   "version": 2,
   "name": "nuvi-backend",
+  "outputDirectory": ".",
   "functions": {
     "api/index.ts": {
       "includeFiles": "server*.ts",
