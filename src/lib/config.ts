@@ -9,16 +9,23 @@
  * same-origin (empty string) for local dev / Electron (localhost:3000).
  */
 
+function cleanUrl(v: string | undefined): string {
+  if (!v) return "";
+  // Strip surrounding quotes if user pasted "https://..." with quotes
+  let s = v.trim().replace(/^["']|["']$/g, "").trim().replace(/\/$/, "");
+  return s;
+}
 export const BACKEND_URL: string = (() => {
-  // Vite exposes env via import.meta.env
-  const viteUrl = (import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined;
-  if (viteUrl && viteUrl.trim()) {
-    return viteUrl.trim().replace(/\/$/, "");
-  }
-  // Allow NUVI_SERVER_URL as alias (non-VITE prefix for backend parity)
-  const alt = (import.meta as any)?.env?.VITE_SERVER_URL as string | undefined;
-  if (alt && alt.trim()) return alt.trim().replace(/\/$/, "");
-  // Same-origin fallback (Electron / local dev where frontend and backend share origin)
+  // Vite exposes env via import.meta.env — must be VITE_ prefix to be inlined at build time
+  const viteUrl = cleanUrl((import.meta as any)?.env?.VITE_BACKEND_URL as string | undefined);
+  if (viteUrl) return viteUrl;
+  // Aliases commonly set on backend but mistakenly expected on frontend
+  const alt1 = cleanUrl((import.meta as any)?.env?.VITE_SERVER_URL as string | undefined);
+  if (alt1) return alt1;
+  const alt2 = cleanUrl((import.meta as any)?.env?.NUVI_SERVER_URL as string | undefined);
+  if (alt2) return alt2;
+  // Same-origin fallback (Electron / local dev where frontend and backend share origin,
+  // or when frontend rewrite proxies /api to the backend deployment)
   return "";
 })();
 

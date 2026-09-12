@@ -1,11 +1,6 @@
 {
-  "version": 2,
-  "name": "nuvi-backend",
-  "routes": [
-    { "src": "/(.*)", "dest": "/api/index" }
-  ],
-  "env": {
-    "VITE_FRONTEND_URL": "https://nuviai.vercel.app",
-    "FRONTEND_URL": "https://nuviai.vercel.app"
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "functions": {
+    "api/index.ts": { "maxDuration": 30 }
   }
 }

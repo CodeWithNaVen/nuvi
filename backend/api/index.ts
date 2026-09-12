@@ -12,7 +12,27 @@ async function getApp() {
     process.env.VERCEL = "1";
     appPromise = (async () => {
       try {
-        const { createApp } = await import("../server.js");
+        // Try multiple import paths to survive different Vercel build layouts:
+        // - Local dev / bundled: ../server.js (compiled JS)
+        // - Vercel TS runtime: ../server.ts (direct TS)
+        let mod: any = null;
+        try {
+          mod = await import("../server.js");
+        } catch (e1: any) {
+          // Fallback: Vercel may keep the source as .ts without a pre-build
+          try {
+            mod = await import("../server.ts");
+          } catch (e2: any) {
+            // Last fallback: esbuild bundle at dist/server.cjs (CJS interop)
+            try {
+              const cjs = await import("../dist/server.cjs");
+              mod = (cjs as any).default ?? cjs;
+            } catch {}
+            if (!mod?.createApp) throw e1;
+          }
+        }
+        const createApp = mod.createApp ?? mod.default?.createApp;
+        if (!createApp) throw new Error("createApp not found in server module");
         const { app } = await createApp();
         return app;
       } catch (e) {

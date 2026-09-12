@@ -1,12 +1,15 @@
 {
-  "version": 2,
-  "name": "nuvi-frontend",
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "env": {
-    "VITE_BACKEND_URL": "https://nuvi-server.vercel.app",
-    "VITE_FRONTEND_URL": "https://nuviai.vercel.app",
-    "FRONTEND_URL": "https://nuviai.vercel.app"
-  }
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://nuvi-server.vercel.app/api/$1"
+    },
+    {
+      "source": "/live",
+      "destination": "https://nuvi-server.vercel.app/live"
+    }
+  ]
 }
