@@ -15,6 +15,16 @@ import { apiUrl } from "../lib/config";
 
 type Phase = "checking" | "needsKey" | "ready";
 
+async function parseJsonResponse<T = any>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Backend returned invalid JSON (${res.status}): ${text.slice(0, 200)}`);
+  }
+}
+
 export function ApiKeyGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>("checking");
   const [value, setValue] = useState("");
@@ -51,8 +61,8 @@ export function ApiKeyGate({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: key }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save the key.");
+      const data = await parseJsonResponse(res);
+      if (!res.ok) throw new Error((data as any)?.error || "Could not save the key.");
       setValue("");
       setPhase("ready");
     } catch (err) {
