@@ -306,6 +306,17 @@ export async function createApp() {
     next();
   });
 
+  // Simple root response for Vercel/serverless health checks and landing page requests.
+  app.get("/", (_req, res) => {
+    res.json({
+      status: "ok",
+      service: "nuvi-backend",
+      health: "/health",
+      api: "/api",
+      version: "1.0.0",
+    });
+  });
+
   // Memory REST API Endpoints
   app.get("/api/memories", async (req, res) => {
     try {
