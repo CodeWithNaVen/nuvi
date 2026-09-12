@@ -1,29 +1,47 @@
 /**
  * Vercel Serverless entry for NUVI backend.
  * Deployed as https://nuvi-server.vercel.app
- *
- * Vercel will import this file as a serverless function.
- * We lazily create the Express app via createApp() from server.ts.
- * WebSocket (/live) is not supported on Vercel serverless functions —
- * the frontend will fallback to REST or show a message; for full Live
- * support deploy with Vercel Fluid Compute or a long-running host.
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 let appPromise: Promise<any> | null = null;
+let initError: any = null;
 
 async function getApp() {
+  if (initError) throw initError;
   if (!appPromise) {
-    // Ensure VERCEL env is set before importing server.ts (it checks it)
     process.env.VERCEL = "1";
-    const { createApp } = await import("../server");
-    appPromise = createApp().then(({ app }) => app);
+    appPromise = (async () => {
+      try {
+        const { createApp } = await import("../server.js");
+        const { app } = await createApp();
+        return app;
+      } catch (e) {
+        initError = e;
+        console.error("[Vercel] createApp failed:", e);
+        throw e;
+      }
+    })();
   }
   return appPromise;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const app = await getApp();
-  // Delegate to Express
-  return (app as any)(req, res);
+  try {
+    const app = await getApp();
+    return (app as any)(req, res);
+  } catch (e: any) {
+    console.error("[Vercel] handler error:", e?.stack || e);
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Function invocation failed",
+        detail: e?.message || String(e),
+        hint: "Check Vercel Function Logs. Ensure GEMINI_API_KEY is set in Vercel Env."
+      });
+    }
+  }
 }
+
+export const config = {
+  maxDuration: 30
+};

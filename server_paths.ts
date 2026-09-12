@@ -16,8 +16,10 @@
 import fs from "fs";
 import path from "path";
 
-/** Writable per-user data directory. Falls back to cwd in development. */
-export const DATA_DIR: string = process.env.NUVI_DATA_DIR || process.cwd();
+/** Writable per-user data directory. Falls back to cwd in development.
+ *  On Vercel (read-only /var/task) use /tmp which is writable. */
+export const DATA_DIR: string = process.env.NUVI_DATA_DIR
+  || (process.env.VERCEL ? "/tmp/nuvi-data" : process.cwd());
 
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true });
