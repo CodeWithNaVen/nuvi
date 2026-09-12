@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "name": "nuvi-server",
-  "buildCommand": "echo 'server: skipping vite build - api only'",
+  "name": "nuvi-backend",
   "functions": {
     "api/index.ts": {
       "includeFiles": "server*.ts",
@@ -9,10 +8,7 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index"
-    }
+    { "source": "/(.*)", "destination": "/api/index" }
   ],
   "env": {
     "VITE_FRONTEND_URL": "https://nuviai.vercel.app",

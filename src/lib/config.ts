@@ -2,7 +2,7 @@
  * NUVI — Frontend config for backend URL.
  *
  * Supports split Vercel deployments:
- *  - https://nuvi.vercel.app (frontend)
+ *  - https://nuviai.vercel.app (frontend)
  *  - https://nuvi-server.vercel.app (backend + agents + WS)
  *
  * VITE_BACKEND_URL is injected at build time via Vite. Falls back to

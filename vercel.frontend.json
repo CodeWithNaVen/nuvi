@@ -12,6 +12,6 @@
   ],
   "env": {
     "VITE_BACKEND_URL": "https://nuvi-server.vercel.app",
-    "VITE_FRONTEND_URL": "https://nuvi.vercel.app"
+    "VITE_FRONTEND_URL": "https://nuviai.vercel.app"
   }
 }
