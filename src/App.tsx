@@ -78,12 +78,38 @@ export default function App() {
   const screenVisionRef = useRef(true);
   const liveStateRef = useRef<LiveState>("disconnected");
 
+  // Camera preview + scene analysis
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState("Camera off");
+  const [cameraResult, setCameraResult] = useState<Record<string, any> | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraIntervalRef = useRef<any>(null);
+  const cameraActiveRef = useRef(false);
+
   useEffect(() => { isPausedRef.current = isScreenSharingPaused; }, [isScreenSharingPaused]);
   useEffect(() => { screenVisionRef.current = screenVisionMode; }, [screenVisionMode]);
   useEffect(() => { liveStateRef.current = liveState; }, [liveState]);
+  useEffect(() => { cameraActiveRef.current = isCameraActive; }, [isCameraActive]);
+
+  // Attach stream to video when it mounts after isCameraActive becomes true
+  useEffect(() => {
+    if (isCameraActive && cameraVideoRef.current && cameraStreamRef.current) {
+      const v = cameraVideoRef.current;
+      if (v.srcObject !== cameraStreamRef.current) {
+        v.srcObject = cameraStreamRef.current;
+        v.play().catch(() => {});
+      }
+    }
+  }, [isCameraActive]);
 
   // Cleanup on unmount
-  useEffect(() => () => { if (screenIntervalRef.current) clearInterval(screenIntervalRef.current); }, []);
+  useEffect(() => () => {
+    if (screenIntervalRef.current) clearInterval(screenIntervalRef.current);
+    if (cameraIntervalRef.current) clearInterval(cameraIntervalRef.current);
+    if (cameraStreamRef.current) cameraStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+  }, []);
 
   // Theme persistence
   useEffect(() => {
@@ -224,6 +250,179 @@ export default function App() {
     await startScreenSharing();
   };
 
+  const sendCameraFrameToSession = () => {
+    const video = cameraVideoRef.current;
+    if (!video || !cameraActiveRef.current || !cameraStreamRef.current || liveStateRef.current === "disconnected") return;
+    try {
+      if (video.videoWidth === 0 || video.videoHeight === 0) return;
+      if (!cameraCanvasRef.current) cameraCanvasRef.current = document.createElement("canvas");
+      const canvas = cameraCanvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const maxDim = 960;
+      let w = video.videoWidth;
+      let h = video.videoHeight;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      const b64 = canvas.toDataURL("image/jpeg", 0.6).split(",")[1];
+      sessionRef.current?.sendVideoFrame(b64);
+    } catch (e) {
+      console.error("[Nuvi Camera] frame send failed", e);
+    }
+  };
+
+  const stopCameraSession = () => {
+    if (cameraIntervalRef.current) {
+      clearInterval(cameraIntervalRef.current);
+      cameraIntervalRef.current = null;
+    }
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+    cameraActiveRef.current = false;
+    setIsCameraActive(false);
+    setCameraStatus("Camera off");
+  };
+
+  const startCameraSession = async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraStatus("This browser cannot access a camera.");
+        return;
+      }
+      // Prevent double-open if already active
+      if (cameraActiveRef.current && cameraStreamRef.current) {
+        setCameraStatus("Camera live");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setIsCameraActive(true);
+      cameraActiveRef.current = true;
+      setCameraStatus("Camera live");
+      setCameraResult(null);
+
+      if (cameraIntervalRef.current) clearInterval(cameraIntervalRef.current);
+      cameraIntervalRef.current = setInterval(sendCameraFrameToSession, 2000);
+
+      // Attach stream to video – handle both immediate mount and delayed mount via effect
+      setTimeout(() => {
+        if (cameraVideoRef.current) {
+          if (cameraVideoRef.current.srcObject !== stream) {
+            cameraVideoRef.current.srcObject = stream;
+          }
+          cameraVideoRef.current.play().catch(() => {});
+          setTimeout(sendCameraFrameToSession, 300);
+        }
+      }, 100);
+      // Extra retry for slow mounts (React state -> render)
+      setTimeout(() => {
+        if (cameraVideoRef.current && cameraVideoRef.current.srcObject !== stream) {
+          cameraVideoRef.current.srcObject = stream;
+          cameraVideoRef.current.play().catch(() => {});
+        }
+      }, 400);
+    } catch (error: any) {
+      setCameraStatus(error?.message || "Camera permission denied");
+      setIsCameraActive(false);
+      cameraActiveRef.current = false;
+    }
+  };
+
+  const captureCameraBrowserFrame = (): string | null => {
+    const video = cameraVideoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) return null;
+    try {
+      const canvas = cameraCanvasRef.current || document.createElement("canvas");
+      if (!cameraCanvasRef.current) cameraCanvasRef.current = canvas;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      const maxDim = 1280;
+      let w = video.videoWidth;
+      let h = video.videoHeight;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(video, 0, 0, w, h);
+      return canvas.toDataURL("image/jpeg", 0.72).split(",")[1];
+    } catch {
+      return null;
+    }
+  };
+
+  const runCameraAnalysis = async (mode: "analyze" | "ocr") => {
+    try {
+      setCameraStatus(mode === "analyze" ? "Analyzing camera scene…" : "Reading camera text…");
+      const tool = mode === "analyze" ? "analyzeCameraFrame" : "readCameraText";
+      // Prefer a browser-captured frame to avoid Windows MSMF exclusive-lock
+      // conflict (error -1072875772) when getUserMedia already holds the device.
+      let browserB64 = captureCameraBrowserFrame();
+      // If video not ready yet, give it a moment and retry once
+      if (!browserB64 && cameraActiveRef.current) {
+        await new Promise((r) => setTimeout(r, 350));
+        browserB64 = captureCameraBrowserFrame();
+      }
+      const args: Record<string, unknown> = {
+        camera_id: 0,
+        include_image: true,
+        max_dim: 1280,
+        max_chars: 2000,
+      };
+      if (browserB64) {
+        args.image_base64 = browserB64;
+      }
+      // Use same-origin proxy so web and Electron both work (direct 127.0.0.1 fails in web/CORS)
+      let response: Response | null = null;
+      let data: any = null;
+      try {
+        response = await fetch("/api/desktop/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tool, args }),
+        });
+        data = await response.json();
+      } catch {
+        // Fallback to direct desktop agent (dev / Electron)
+        response = await fetch("http://127.0.0.1:8765/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tool, args }),
+        });
+        data = await response.json();
+      }
+      if (!response || !response.ok || !data.ok) {
+        // Web without desktop agent: graceful browser-only fallback
+        if (!data?.ok && String(data?.error || "").toLowerCase().includes("not running") && browserB64) {
+          setCameraResult({ result: "Browser preview only (desktop agent offline). Live video is streaming to Gemini.", image_base64: browserB64 });
+          setCameraStatus(mode === "analyze" ? "Scene visible (browser-only)" : "Text capture (browser-only)");
+          return;
+        }
+        throw new Error(data?.error || "Camera tool failed");
+      }
+      setCameraResult(data.result || {});
+      setCameraStatus(mode === "analyze" ? "Scene analyzed" : "Text read");
+    } catch (error: any) {
+      setCameraStatus(error?.message || "Camera analysis failed");
+    }
+  };
+
   // Audio session
   useEffect(() => {
     sessionRef.current = new NuviAudioSession({
@@ -257,6 +456,77 @@ export default function App() {
           const ok = ["violet","crimson","emerald","celestial","gold","rose","charcoal"];
           if (ok.includes(c)) { setThemeColor(c); callback({ result: `Theme changed to ${c}` }); }
           else callback({ error: `Unsupported color ${c}` });
+        } else if (name === "openCamera" || name === "startCamera" || name === "enableCamera") {
+          (async () => {
+            try {
+              await startCameraSession();
+              // Give mount a moment before confirming
+              await new Promise((r) => setTimeout(r, 500));
+              if (cameraActiveRef.current) callback({ result: "Camera opened – preview is live and streaming to session." });
+              else callback({ error: "Failed to open camera – permission denied or no device." });
+            } catch (e: any) {
+              callback({ error: e?.message || "Failed to open camera" });
+            }
+          })();
+          return;
+        } else if (name === "closeCamera" || name === "stopCamera" || name === "disableCamera") {
+          stopCameraSession();
+          callback({ result: "Camera closed." });
+        } else if (["captureCameraFrame", "analyzeCameraFrame", "readCameraText"].includes(name)) {
+          // Route camera capture through browser preview to avoid MSMF exclusive lock
+          (async () => {
+            try {
+              if (!cameraActiveRef.current) {
+                try { await startCameraSession(); await new Promise((r) => setTimeout(r, 700)); } catch {}
+              }
+              let b64 = captureCameraBrowserFrame();
+              if (!b64 && cameraActiveRef.current) {
+                await new Promise((r) => setTimeout(r, 350));
+                b64 = captureCameraBrowserFrame();
+              }
+              const fwdArgs: Record<string, any> = { ...(args || {}) };
+              if (b64) fwdArgs.image_base64 = b64;
+              // Prefer same-origin proxy (works in web + Electron)
+              let res: Response | null = null;
+              let data: any = null;
+              try {
+                res = await fetch("/api/desktop/execute", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ tool: name, args: fwdArgs }),
+                });
+                data = await res.json();
+              } catch {
+                res = await fetch("http://127.0.0.1:8765/execute", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ tool: name, args: fwdArgs }),
+                });
+                data = await res.json();
+              }
+              if (res && res.ok && data.ok) {
+                if (data.result) setCameraResult(data.result);
+                // Update status for UI feedback
+                if (name === "analyzeCameraFrame") setCameraStatus("Scene analyzed");
+                else if (name === "readCameraText") setCameraStatus("Text read");
+                else setCameraStatus("Camera frame captured");
+                callback({ result: data.result });
+              } else {
+                // Browser-only fallback when agent unavailable but we have a frame
+                if (String(data?.error || "").toLowerCase().includes("not running") && b64) {
+                  const fallback = { result: "Captured browser frame (desktop agent offline – preview is live).", image_base64: b64, camera_id: 0 } as any;
+                  setCameraResult(fallback);
+                  setCameraStatus("Camera frame captured (browser-only)");
+                  callback({ result: fallback });
+                } else {
+                  callback({ error: data?.error || `Camera tool ${name} failed` });
+                }
+              }
+            } catch (e: any) {
+              callback({ error: e?.message || `Camera ${name} failed` });
+            }
+          })();
+          return;
         } else {
           callback({ result: `Desktop control is handling ${name}; browser and app actions execute through the real desktop automation layer.` });
         }
@@ -416,6 +686,13 @@ export default function App() {
                 <Monitor size={16} />
               </button>
               <button
+                onClick={isCameraActive ? stopCameraSession : startCameraSession}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border transition ${isCameraActive ? "border-[var(--accent)]/35 bg-[var(--accent)]/10 text-[var(--accent)] shadow-[0_0_18px_var(--accent-glow)]" : "border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-faint)] hover:border-[var(--accent)]/30 hover:text-[var(--text)]"}`}
+                title={isCameraActive ? "Close camera" : "Open camera"}
+              >
+                <Video size={16} />
+              </button>
+              <button
                 onClick={handleToggleConnection}
                 className={`flex h-16 w-16 items-center justify-center rounded-full border transition ${liveState === "disconnected" ? "border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.10] hover:border-white/20" : liveState === "listening" ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200 shadow-[0_0_24px_rgba(16,185,129,0.25)]" : liveState === "speaking" ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_0_24px_var(--accent-glow)]" : "border-amber-400/50 bg-amber-500/15 text-amber-200"}`}
                 title={liveState === "disconnected" ? "Awake Nuvi" : "Sleep"}
@@ -484,6 +761,51 @@ export default function App() {
                   <span>Vision Mode</span>
                   <input type="checkbox" checked={screenVisionMode} onChange={(e) => setScreenVisionMode(e.target.checked)} className="accent-[var(--accent)]" />
                 </label>
+              </motion.div>
+            )}
+            {isCameraActive && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, x: -20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.92, x: -20 }}
+                className="absolute bottom-6 left-6 z-20 flex w-72 flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)]/90 p-3 backdrop-blur-xl shadow-2xl"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider text-[var(--text)]">
+                    <span className="h-2 w-2 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_12px_var(--accent-glow)]" />
+                    Camera
+                  </div>
+                  <button onClick={stopCameraSession} className="rounded-lg p-1 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"><X size={14} /></button>
+                </div>
+                <div className="relative aspect-video overflow-hidden rounded-xl border border-[var(--border-soft)] bg-black">
+                  <video
+                    ref={(el) => {
+                      cameraVideoRef.current = el;
+                      if (el && cameraStreamRef.current) {
+                        if (el.srcObject !== cameraStreamRef.current) el.srcObject = cameraStreamRef.current;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover opacity-90"
+                  />
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-[var(--text-dim)]">{cameraStatus}</div>
+                <div className="flex gap-1.5">
+                  <button onClick={() => runCameraAnalysis("analyze")} className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-panel)] px-2 py-1.5 font-mono text-[10px] text-[var(--text)] hover:border-[var(--accent)]/30 hover:text-[var(--accent)]">Analyze</button>
+                  <button onClick={() => runCameraAnalysis("ocr")} className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-panel)] px-2 py-1.5 font-mono text-[10px] text-[var(--text)] hover:border-[var(--accent)]/30 hover:text-[var(--accent)]">Read text</button>
+                </div>
+                {cameraResult && (
+                  <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--bg-panel)] p-2 text-[10px] leading-relaxed text-[var(--text)]">
+                    <div className="font-mono uppercase tracking-widest text-[var(--text-faint)]">Result</div>
+                    {cameraResult.scene_summary && <div className="mt-1">{cameraResult.scene_summary}</div>}
+                    {cameraResult.text && <div className="mt-1 whitespace-pre-wrap">{cameraResult.text}</div>}
+                    {typeof cameraResult.objects_detected !== "undefined" && <div className="mt-1">Objects: {cameraResult.objects_detected}</div>}
+                    {typeof cameraResult.brightness !== "undefined" && <div>Brightness: {cameraResult.brightness}</div>}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

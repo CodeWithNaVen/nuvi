@@ -113,6 +113,9 @@ DESKTOP_TOOL_NAMES = [
     "saveScreenshot",
     "analyzeScreenshot",
     "readScreen",
+    "captureCameraFrame",
+    "analyzeCameraFrame",
+    "readCameraText",
     # browser automation (Playwright — desktop-owned, separate from holographic UI)
     "desktopBrowserOpen",
     "desktopBrowserNavigate",
@@ -168,6 +171,7 @@ _MODULE_NAMES = [
     "tools_windows",
     "tools_clipboard",
     "tools_screenshot",
+    "tools_camera",
     "tools_browser",
     "tools_coding",
     "tools_system",

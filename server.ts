@@ -68,6 +68,9 @@ const DESKTOP_TOOLS: ReadonlySet<string> = new Set([
   "copySelected", "pasteClipboard", "getClipboard", "clearClipboard",
   // screenshot / screen reading
   "takeScreenshot", "saveScreenshot", "analyzeScreenshot", "readScreen",
+  // camera capture is handled browser-side (openCamera/closeCamera + browser frame bypass)
+  // to avoid Windows MSMF exclusive-lock; the frontend proxies to /api/desktop/execute
+  // with image_base64 when needed, so these are NOT routed directly to the agent.
   // browser automation intentionally disabled for normal user workflows; all
   // browser actions should open in the user's default system browser instead.
   // coding assistance
@@ -422,6 +425,20 @@ async function startServer() {
     } catch (e: any) {
       logError(`APIKEY_SAVE_ERROR: ${e?.message || e}`);
       res.status(500).json({ error: e?.message || "Failed to save API key." });
+    }
+  });
+
+  // V2.1: Desktop agent proxy – lets the frontend (web + Electron) call
+  // camera/desktop tools via same-origin without CORS / hardcoded 127.0.0.1.
+  app.post("/api/desktop/execute", async (req, res) => {
+    try {
+      const { tool, args } = (req.body || {}) as { tool?: string; args?: Record<string, unknown> };
+      if (!tool) return res.status(400).json({ ok: false, error: "Missing 'tool' in request body." });
+      const result = await callDesktopAgent(String(tool), (args || {}) as Record<string, unknown>);
+      if (result.ok) return res.json({ ok: true, result: result.result });
+      return res.status(502).json({ ok: false, error: result.error || "Desktop agent error." });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e?.message || String(e) });
     }
   });
 
@@ -866,9 +883,10 @@ async function startServer() {
         "   - FILE MANAGEMENT: Use 'createFile', 'readFile', 'renameFile', 'deleteFile' (safe Recycle Bin by default), 'moveFile', 'openFolder' (desktop/documents/downloads), 'listFiles', 'searchFiles'. Example: 'Create notes.txt on Desktop' -> createFile(path='Desktop/notes.txt'). 'Find my Python files' -> searchFiles(extension='py').\n" +
         "   - PC CONTROL: Use 'volumeUp', 'volumeDown', 'setVolume', 'muteToggle' for audio. For DANGEROUS actions (shutdown/restart/sleep/lock) you MUST use the two-step flow: first call 'requestPowerAction' to get a confirmation token, then ASK THE USER OUT LOUD to confirm (e.g. 'Are you sure you want me to shut down your PC?'). Only if they say yes, call 'executePowerAction' with the token. Never run a power action without explicit verbal confirmation.\n" +
         "   - WINDOW MANAGEMENT: Use 'minimizeWindow', 'maximizeWindow', 'closeWindow', 'switchApplication' to control the active or named window.\n" +
-        "   - CLIPBOARD: Use 'copySelected' (sends Ctrl+C, reads clipboard), 'pasteClipboard' (writes + Ctrl+V), 'getClipboard', 'clearClipboard'.\n" +
-         "   - SCREENSHOT & SCREEN READING: Use 'takeScreenshot', 'saveScreenshot', 'analyzeScreenshot' (OCR of the screen), 'readScreen' (OCR of the active window + its title). Use these to answer 'What error is showing on my screen?' or 'Read the visible text'.\n" +
-         "   - MOUSE & CURSOR CONTROL (pyautogui): Use 'clickText' to find visible text by OCR and click its center — PREFERRED for 'click on chat named xyz in inbox', 'open chat xyz' (more reliable than guessing pixels). Use 'getMousePosition' to know cursor/screen size, 'moveMouse' for absolute pixels, 'clickMouse' for direct pixel clicks, 'doubleClickMouse', 'dragMouse', 'scrollMouse'. For pixel clicks, estimate via screen vision/takeScreenshot then moveMouse then clickMouse; for text targets use clickText(text='xyz') directly.\n" +
+         "   - CLIPBOARD: Use 'copySelected' (sends Ctrl+C, reads clipboard), 'pasteClipboard' (writes + Ctrl+V), 'getClipboard', 'clearClipboard'.\n" +
+          "   - SCREENSHOT & SCREEN READING: Use 'takeScreenshot', 'saveScreenshot', 'analyzeScreenshot' (OCR of the screen), 'readScreen' (OCR of the active window + its title). Use these to answer 'What error is showing on my screen?' or 'Read the visible text'.\n" +
+          "   - CAMERA: Use 'openCamera' when user says 'open camera'/'turn on camera' and 'closeCamera' for 'close camera'/'turn off camera'. These toggle the browser preview (which also streams frames to the session). Use 'captureCameraFrame' to grab a still, 'analyzeCameraFrame' to describe the scene, 'readCameraText' to OCR real-world text. If the preview is already open, the frame is sourced from the browser to avoid Windows MSMF exclusive-lock errors.\n" +
+          "   - MOUSE & CURSOR CONTROL (pyautogui): Use 'clickText' to find visible text by OCR and click its center — PREFERRED for 'click on chat named xyz in inbox', 'open chat xyz' (more reliable than guessing pixels). Use 'getMousePosition' to know cursor/screen size, 'moveMouse' for absolute pixels, 'clickMouse' for direct pixel clicks, 'doubleClickMouse', 'dragMouse', 'scrollMouse'. For pixel clicks, estimate via screen vision/takeScreenshot then moveMouse then clickMouse; for text targets use clickText(text='xyz') directly.\n" +
         "   - For browser tasks, always launch the website in the user’s default browser and then use screen-aware desktop tools such as clickText, moveMouse, scrollMouse, and pasteClipboard for interaction. Do not open a separate test browser for normal user requests.\n" +
         "   - CODING ASSISTANCE: Use 'createPythonFile', 'writeCodeFile' (any language), 'createProjectFolder' (with subfolders), 'runPythonScript' (captures output). Example: 'Create and run a hello world Python script' -> createPythonFile then runPythonScript, then read back the output naturally.\n" +
         "   - SYSTEM INFORMATION: Use 'systemInfo' (CPU/RAM/disk/uptime), 'gpuInfo' (NVIDIA stats), 'temperatureInfo' to answer 'How is my CPU usage?' or 'What's my GPU temperature?'.\n" +
@@ -1094,6 +1112,31 @@ async function startServer() {
                   name: "readScreen",
                   description: "OCR the active window and return its title plus visible text.",
                   parameters: { type: Type.OBJECT, properties: { max_chars: { type: Type.INTEGER, description: "Max OCR chars (default 1500)." } } }
+                },
+                {
+                  name: "captureCameraFrame",
+                  description: "Capture a still image from the default webcam/camera so the agent can see objects outside the screen and process the real-world scene. If the browser already holds the camera (getUserMedia preview active), pass image_base64 (base64 JPEG from a canvas capture) to bypass the hardware MSMF exclusive-lock and avoid error -1072875772.",
+                  parameters: { type: Type.OBJECT, properties: { camera_id: { type: Type.INTEGER, description: "Camera device index (default 0)." }, include_image: { type: Type.BOOLEAN, description: "Include compressed JPEG image data (default true)." }, max_dim: { type: Type.INTEGER, description: "Max image dimension before compression (default 1280)." }, image_base64: { type: Type.STRING, description: "Optional base64 JPEG from browser canvas. When supplied, hardware capture is bypassed and this frame is analyzed directly." } } }
+                },
+                {
+                  name: "analyzeCameraFrame",
+                  description: "Capture a live camera frame and return a lightweight scene summary, object count, brightness, and optional JPEG so the agent can interpret what is in view outside the screen. Prefer passing image_base64 from the browser preview when available to avoid MSMF exclusive-lock error -1072875772.",
+                  parameters: { type: Type.OBJECT, properties: { camera_id: { type: Type.INTEGER, description: "Camera device index (default 0)." }, include_image: { type: Type.BOOLEAN, description: "Include compressed JPEG image data (default true)." }, max_dim: { type: Type.INTEGER, description: "Max image dimension before compression (default 1280)." }, image_base64: { type: Type.STRING, description: "Optional base64 JPEG from browser canvas to bypass hardware capture." } } }
+                },
+                {
+                  name: "readCameraText",
+                  description: "Capture a live camera frame and OCR the visible text in the scene, useful for reading signs, labels, screens, or hand-written text in the real world. Pass image_base64 when the browser camera preview is active to avoid device-busy errors.",
+                  parameters: { type: Type.OBJECT, properties: { camera_id: { type: Type.INTEGER, description: "Camera device index (default 0)." }, include_image: { type: Type.BOOLEAN, description: "Include compressed JPEG image data (default true)." }, max_dim: { type: Type.INTEGER, description: "Max image dimension before compression (default 1280)." }, max_chars: { type: Type.INTEGER, description: "Maximum text length to return (default 1500)." }, image_base64: { type: Type.STRING, description: "Optional base64 JPEG from browser canvas to bypass hardware capture." } } }
+                },
+                {
+                  name: "openCamera",
+                  description: "Open the browser camera preview so the live video is visible and streams to the session. Call when user says 'open camera', 'turn on camera', 'show camera', 'enable camera'.",
+                  parameters: { type: Type.OBJECT, properties: {} }
+                },
+                {
+                  name: "closeCamera",
+                  description: "Close the browser camera preview. Call when user says 'close camera', 'turn off camera', 'stop camera', 'disable camera'.",
+                  parameters: { type: Type.OBJECT, properties: {} }
                 },
                 {
                   name: "createPythonFile",
