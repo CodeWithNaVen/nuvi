@@ -24,8 +24,13 @@ export const BACKEND_URL: string = (() => {
   if (alt1) return alt1;
   const alt2 = cleanUrl((import.meta as any)?.env?.NUVI_SERVER_URL as string | undefined);
   if (alt2) return alt2;
-  // Same-origin fallback (Electron / local dev where frontend and backend share origin,
-  // or when frontend rewrite proxies /api to the backend deployment)
+  // Production fallback: Vercel frontend must hit Render backend directly for WS
+  // (Vercel rewrites don't proxy WebSocket upgrades). Hardcode so even if
+  // VITE_BACKEND_URL not inlined (cache) we still connect to the live backend.
+  if (typeof window !== "undefined" && window.location.hostname === "nuviai.vercel.app") {
+    return "https://nuvi.onrender.com";
+  }
+  // Same-origin fallback (Electron / local dev where frontend and backend share origin)
   return "";
 })();
 
