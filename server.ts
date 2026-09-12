@@ -5,6 +5,7 @@ import { WebSocketServer } from "ws";
 import { GoogleGenAI, Modality, Type, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
 import * as fs from "fs";
+import { spawn, execSync } from "child_process";
 import { 
   loadMemories, 
   saveMemories, 
@@ -104,7 +105,6 @@ let desktopAgentVerified = false;
  * even if NUVI's node process is killed.
  */
 function spawnDesktopAgent(): void {
-  const { spawn } = require("child_process");
   const agentEnv = {
     ...process.env,
     NUVI_AGENT_HOST: "127.0.0.1",
@@ -142,7 +142,7 @@ function spawnDesktopAgent(): void {
   ].filter(Boolean) as string[];
   const py = candidates.find((p) => {
     try {
-      require("child_process").execSync(`"${p}" --version`, { stdio: "ignore" });
+      execSync(`"${p}" --version`, { stdio: "ignore" });
       return true;
     } catch {
       return false;
@@ -285,6 +285,14 @@ async function startServer() {
   const PORT = 3000;
   
   app.use(express.json());
+  // CORS for mobile (Expo Go / web on different port) and localhost dev
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+  });
 
   // Memory REST API Endpoints
   app.get("/api/memories", async (req, res) => {
@@ -1469,6 +1477,24 @@ async function startServer() {
             session.sendRealtimeInput({
               video: { data: msg.video, mimeType: "image/jpeg" }
             });
+          } else if ((msg.type === "text" && msg.text) || (msg.text && typeof msg.text === "string" && !msg.audio && !msg.video)) {
+            const t = String((msg as any).text || '').trim();
+            if (t) {
+              console.log(`[Live Text] "${t}"`);
+              let sent = false;
+              try {
+                // Preferred for Live: clientContent with turnComplete
+                (session as any).sendClientContent?.({ turns: [{ role: "user", parts: [{ text: t }] }], turnComplete: true });
+                sent = true;
+                console.log('[Live Text] sent via sendClientContent');
+              } catch (e) { console.warn('[Live Text] sendClientContent failed', (e as any)?.message || e); }
+              if (!sent) {
+                try {
+                  (session as any).sendRealtimeInput?.({ text: t });
+                  console.log('[Live Text] sent via sendRealtimeInput');
+                } catch (e) { console.warn('[Live Text] sendRealtimeInput failed', (e as any)?.message || e); }
+              }
+            }
           } else if (msg.type === "toolResponse") {
             session.sendToolResponse({
               functionResponses: [

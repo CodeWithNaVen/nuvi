@@ -54,5 +54,10 @@ Commands:
     npm run dev
 
     npm run electron
- opencode -s ses_f74f2c4c3ffeDHNPP0JFSzmRAG
+
+
+for mobile:
+npm run mobile:install
+npm run dev #server for mobile
+npm run mobile
 ```

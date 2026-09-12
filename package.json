@@ -14,7 +14,12 @@
     "lint": "tsc --noEmit",
     "electron": "electron .",
     "app": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --win nsis portable"
+    "dist": "npm run build && electron-builder --win nsis portable",
+    "mobile": "npm --prefix mobile start",
+    "mobile:install": "npm --prefix mobile install",
+    "mobile:android": "npm --prefix mobile run android",
+    "mobile:ios": "npm --prefix mobile run ios",
+    "mobile:web": "npm --prefix mobile run web"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

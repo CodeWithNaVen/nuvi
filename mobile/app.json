@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Nuvi AI",
+    "slug": "nuvi-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "nuvi-mobile",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.nuvi.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Nuvi needs camera access to show your surroundings and let the assistant see the real world.",
+        "NSMicrophoneUsageDescription": "Nuvi needs microphone access for voice chat with Gemini Live."
+      }
+    },
+    "android": {
+      "package": "com.nuvi.mobile",
+      "permissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.MODIFY_AUDIO_SETTINGS"],
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0F",
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0A0F",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 128
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    }
+  }
+}
