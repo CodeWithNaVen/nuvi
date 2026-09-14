@@ -62,8 +62,8 @@ export function MemoryDashboard({
     project: { 
       label: "Active Projects", 
       icon: Briefcase, 
-      color: "text-cyan-400 border-cyan-500/25", 
-      bg: "bg-cyan-500/5 hover:bg-cyan-500/10" 
+      color: "text-[var(--accent)] border-[var(--accent)]/30", 
+      bg: "bg-[var(--accent)]/5 hover:bg-[var(--accent)]/10" 
     },
     relationship: { 
       label: "Relationships", 
@@ -138,7 +138,7 @@ export function MemoryDashboard({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 z-40 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--bg)]/60 z-40 backdrop-blur-sm"
           />
 
           {/* Slide-over Container */}
@@ -147,41 +147,41 @@ export function MemoryDashboard({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute inset-y-0 right-0 w-full max-w-lg bg-[#020206]/95 border-l border-white/15 backdrop-blur-2xl z-50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8)]"
+            className="absolute inset-y-0 right-0 w-full max-w-lg bg-[var(--bg-elevated)]/95 border-l border-[var(--border-soft)] backdrop-blur-2xl z-50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8)]"
           >
             {/* Header */}
-            <div className="p-6 border-b border-white/10 flex items-center justify-between">
+            <div className="p-6 border-b border-[var(--border-soft)] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl border ${getThemeBadgeGlow()}`}>
                   <Brain size={22} className="animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-display font-medium text-lg tracking-tight text-white flex items-center gap-2">
+                  <h3 className="font-display font-medium text-lg tracking-tight text-[var(--text)] flex items-center gap-2">
                     Nuvi Memory Core
-                    <Sparkles size={14} className="text-cyan-400" />
+                    <Sparkles size={14} className="text-[var(--accent)]" />
                   </h3>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-0.5">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)] mt-0.5">
                     Persistent recollect files ({memories.length})
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Quick stats & action row */}
-            <div className="px-6 py-4 bg-white/5 border-b border-white/5 flex items-center justify-between gap-2.5">
-              <span className="text-[10px] text-slate-400 font-mono">
+            <div className="px-6 py-4 bg-[var(--bg-panel)] border-b border-[var(--border-soft)] flex items-center justify-between gap-2.5">
+              <span className="text-[10px] text-[var(--text-dim)] font-mono">
                 Nuvi remembers these details naturally as you chat.
               </span>
               {!isAdding && (
                 <button
                   onClick={() => setIsAdding(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-xs font-mono tracking-wider text-cyan-300 transition shrink-0 cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-xs font-mono tracking-wider text-[var(--accent)] transition shrink-0 cursor-pointer"
                 >
                   <Plus size={12} />
                   <span>MANUAL SEED</span>
@@ -196,11 +196,11 @@ export function MemoryDashboard({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden border-b border-white/15 bg-[#080812]"
+                  className="overflow-hidden border-b border-[var(--border-soft)] bg-[var(--bg-panel)]"
                 >
                   <form onSubmit={handleManualAdd} className="p-5 space-y-4">
                     <div>
-                      <label className="block text-[11px] font-mono tracking-wider text-slate-300 uppercase mb-2">
+                      <label className="block text-[11px] font-mono tracking-wider text-[var(--text)] uppercase mb-2">
                         Memory Archetype Category
                       </label>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -214,8 +214,8 @@ export function MemoryDashboard({
                               onClick={() => setNewCategory(cat)}
                               className={`flex items-center gap-2 p-1.5 rounded-lg border text-xs tracking-wide transition cursor-pointer ${
                                 active 
-                                  ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
-                                  : "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10"
+                                  ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                                  : "border-[var(--border-soft)] bg-[var(--bg-panel)] text-[var(--text-dim)] hover:bg-[var(--bg-hover)]"
                               }`}
                             >
                               <Icon size={12} />
@@ -227,7 +227,7 @@ export function MemoryDashboard({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-mono tracking-wider text-slate-300 uppercase mb-2">
+                      <label className="block text-[11px] font-mono tracking-wider text-[var(--text)] uppercase mb-2">
                         Recollection Statement (3rd Person declarative)
                       </label>
                       <textarea
@@ -235,7 +235,7 @@ export function MemoryDashboard({
                         onChange={(e) => setNewText(e.target.value)}
                         placeholder="e.g. The user's startup is called Nuvi, a voice AI platform."
                         required
-                        className="w-full h-18 text-xs p-3 rounded-lg border border-white/10 bg-black/40 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 resize-none font-sans"
+                        className="w-full h-18 text-xs p-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-panel)] text-[var(--text)] placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 resize-none font-sans"
                       />
                     </div>
 
@@ -243,14 +243,14 @@ export function MemoryDashboard({
                       <button
                         type="button"
                         onClick={() => setIsAdding(false)}
-                        className="px-3.5 py-1.5 rounded-lg border border-white/5 text-xs font-mono tracking-wide text-slate-400 hover:text-white transition cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-lg border border-[var(--border-soft)] text-xs font-mono tracking-wide text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={submitting}
-                        className="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs uppercase font-mono tracking-widest transition disabled:opacity-50 cursor-pointer"
+                        className="px-4 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent)] text-white font-bold text-xs uppercase font-mono tracking-widest transition disabled:opacity-50 cursor-pointer"
                       >
                         {submitting ? "Saving..." : "Commit Memory"}
                       </button>
@@ -261,13 +261,13 @@ export function MemoryDashboard({
             </AnimatePresence>
 
             {/* TAB SELECTOR SCROLLER */}
-            <div className="px-6 py-4 flex gap-1.5 overflow-x-auto no-scrollbar border-b border-light border-white/10 shrink-0">
+            <div className="px-6 py-4 flex gap-1.5 overflow-x-auto no-scrollbar border-b border-light border-[var(--border-soft)] shrink-0">
               <button
                 onClick={() => setActiveTab("all")}
                 className={`px-3 py-1.5 rounded-full border text-[11px] tracking-wider uppercase transition cursor-pointer shrink-0 ${
                   activeTab === "all"
-                    ? "border-white bg-white text-slate-950 font-bold"
-                    : "border-white/5 bg-white/5 text-slate-400 hover:border-white/15"
+                    ? "border-white bg-white text-white font-bold"
+                    : "border-[var(--border-soft)] bg-[var(--bg-panel)] text-[var(--text-dim)] hover:border-[var(--border-soft)]"
                 }`}
               >
                 All Memories
@@ -281,8 +281,8 @@ export function MemoryDashboard({
                     onClick={() => setActiveTab(cat)}
                     className={`px-3 py-1.5 rounded-full border text-[11px] tracking-wider uppercase transition shrink-0 cursor-pointer ${
                       active
-                        ? "border-white bg-white text-slate-950 font-bold"
-                        : "border-white/5 bg-white/5 text-slate-400 hover:border-white/15"
+                        ? "border-white bg-white text-white font-bold"
+                        : "border-[var(--border-soft)] bg-[var(--bg-panel)] text-[var(--text-dim)] hover:border-[var(--border-soft)]"
                     }`}
                   >
                     {config.label.split(" ")[0]}
@@ -298,12 +298,12 @@ export function MemoryDashboard({
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-500"
+                    className="h-full flex flex-col items-center justify-center p-8 text-center text-[var(--text-faint)]"
                   >
-                    <div className="p-4 rounded-full border border-dashed border-white/10 bg-white/[0.02] mb-4">
+                    <div className="p-4 rounded-full border border-dashed border-[var(--border-soft)] bg-[var(--bg-panel)] mb-4">
                       <Brain size={32} className="opacity-40" />
                     </div>
-                    <h4 className="text-sm font-semibold tracking-wide text-slate-300">No memories recorded yet</h4>
+                    <h4 className="text-sm font-semibold tracking-wide text-[var(--text)]">No memories recorded yet</h4>
                     <p className="text-xs max-w-xs mt-1.5 leading-relaxed font-mono">
                       {activeTab === "all" 
                         ? "Start talking aloud with Nuvi! Her background consolidator analyzes transcript slices and builds a life context naturally."
@@ -321,20 +321,20 @@ export function MemoryDashboard({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className={`flex items-start justify-between gap-4 p-4 rounded-xl border border-white/5 backdrop-blur-md bg-white/[0.02] ${cfg.bg} transition-colors group relative`}
+                        className={`flex items-start justify-between gap-4 p-4 rounded-xl border border-[var(--border-soft)] backdrop-blur-md bg-[var(--bg-panel)] ${cfg.bg} transition-colors group relative`}
                       >
                         <div className="flex gap-3.5 overflow-hidden">
-                          <div className={`p-2 rounded-lg border mt-0.5 shrink-0 bg-black/40 ${cfg.color}`}>
+                          <div className={`p-2 rounded-lg border mt-0.5 shrink-0 bg-[var(--bg-panel)] ${cfg.color}`}>
                             <Icon size={14} />
                           </div>
                           <div className="overflow-hidden">
                             <span className={`text-[9px] font-mono uppercase tracking-wider block ${cfg.color}`}>
                               {cfg.label}
                             </span>
-                            <p className="text-xs text-slate-200 mt-1 font-sans leading-relaxed break-words font-medium">
+                            <p className="text-xs text-[var(--text)] mt-1 font-sans leading-relaxed break-words font-medium">
                               {m.text}
                             </p>
-                            <span className="text-[9px] font-mono text-slate-500 mt-2 block">
+                            <span className="text-[9px] font-mono text-[var(--text-faint)] mt-2 block">
                               Recalled: {formatDate(m.createdAt)}
                             </span>
                           </div>
@@ -343,7 +343,7 @@ export function MemoryDashboard({
                         {/* Forget / Delete trigger button */}
                         <button
                           onClick={() => onDeleteMemory(m.id)}
-                          className="opacity-0 group-hover:opacity-100 p-2 rounded-lg border border-red-500/25 bg-red-950/15 text-red-400 hover:bg-red-500 hover:text-white transition duration-150 absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 shrink-0 cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 p-2 rounded-lg border border-red-500/25 bg-red-950/15 text-red-400 hover:bg-red-500 hover:text-[var(--text)] transition duration-150 absolute top-4 right-4 sm:relative sm:top-0 sm:right-0 shrink-0 cursor-pointer"
                           title="Forget this memory"
                         >
                           <Trash2 size={13} />
@@ -356,9 +356,9 @@ export function MemoryDashboard({
             </div>
 
             {/* Technical visual core footprint footer */}
-            <div className="p-5 border-t border-white/10 bg-black/40 flex items-center justify-between text-[9px] font-mono text-slate-600 tracking-wider">
+            <div className="p-5 border-t border-[var(--border-soft)] bg-[var(--bg-panel)] flex items-center justify-between text-[9px] font-mono text-slate-600 tracking-wider">
               <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_5px_rgba(34,211,238,0.7)] animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_5px_var(--accent-glow)] animate-pulse" />
                 <span>MEM-SYNC STREAM ACTIVE</span>
               </span>
               <span>DURABLE LOCAL JSON DB SEED</span>

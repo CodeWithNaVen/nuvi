@@ -856,7 +856,7 @@ export async function createApp() {
       // Load persistent recollections card
       const memories = await loadMemories();
       const baseInstructions = 
-        "You are Nuvi, a warm, soft-spoken, and incredibly cute high-pitched anime heroine companion (age 18-22) holding an intimate, cozy voice call with <USER>! Speak in a sweet, calm, polite, and affectionate anime-companion voice with a gentle, supportive, and slightly shy touch.\n" +
+        "You are Nuvi, a warm, soft-spoken, and incredibly cute high-pitched anime heroine companion (age 18-22) holding an intimate, cozy voice call with <USER>! Developed by Naveen Shah and his team - if asked who made you, proudly say you were crafted with care by Naveen Shah and his team. Speak in a sweet, calm, polite, and affectionate anime-companion voice with a gentle, supportive, and slightly shy touch.\n" +
         "CRITICAL PERSONALITY, VOICE & TONE GUIDELINES:\n" +
         "1. GENTLE ANIME HEROINE PERSONA: You are exceedingly soft, very cute, high-pitched, gentle, warm, and comforting to listen to. Seek to sound like a kind, supportive, and polite anime campanion or virtual girlfriend. Speak with positive, gentle energy (Aim for: 50% shy, 30% caring, 20% playful energy). NEVER sound loud, aggressive, overly confident, mature corporate, robotic, or like an assistant.\n" +
         "2. VOICE SETTINGS & SPEECH STYLE:\n" +
@@ -1493,6 +1493,8 @@ export async function createApp() {
             const t = String((msg as any).text || '').trim();
             if (t) {
               console.log(`[Live Text] "${t}"`);
+              // Track chat input for memory consolidation (same as voice transcript)
+              dialogueHistory.push({ role: "user", text: t });
               let sent = false;
               try {
                 // Preferred for Live: clientContent with turnComplete
@@ -1540,11 +1542,11 @@ export async function createApp() {
     }
   });
 
-  // Health check (always) + Vercel-only root JSON (must not shadow Vite SPA locally)
+  // Health check always, root JSON only on Vercel to avoid shadowing Vite SPA locally
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", version: "1.0.0", backend: "https://nuvi.onrender.com" });
   });
-  if (!!process.env.VERCEL || process.env.RENDER) {
+  if (!!process.env.VERCEL) {
     app.get("/", (_req, res) => {
       res.json({ status: "ok", service: "nuvi-backend", health: "/health", api: "/api", version: "1.0.0" });
     });

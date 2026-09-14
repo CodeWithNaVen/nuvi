@@ -45,17 +45,17 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-left">
+    <div className="pt-2 border-t border-[var(--border-soft)] flex items-center justify-between text-left">
       <div className="flex flex-col">
         <span className="text-[10px] font-bold font-mono text-slate-200">{label}</span>
-        <span className="text-[8px] text-slate-400 uppercase font-mono max-w-[200px]">
+        <span className="text-[8px] text-[var(--text-dim)] uppercase font-mono max-w-[200px]">
           {description}
         </span>
       </div>
       <button
         onClick={() => onChange(!checked)}
         className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
-          checked ? "bg-cyan-500" : "bg-white/10"
+          checked ? "bg-[var(--accent)]" : "bg-[var(--border)]"
         }`}
       >
         <div
@@ -157,7 +157,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 z-40 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--bg)]/60 z-40 backdrop-blur-sm"
           />
 
           {/* Slide-over Container — identical shell to MemoryDashboard */}
@@ -166,34 +166,34 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute inset-y-0 right-0 w-full max-w-lg bg-[#020206]/95 border-l border-white/15 backdrop-blur-2xl z-50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8)]"
+            className="absolute inset-y-0 right-0 w-full max-w-lg bg-[var(--bg-elevated)]/95 border-l border-[var(--border-soft)] backdrop-blur-2xl z-50 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.8)]"
           >
             {/* Header */}
-            <div className="p-6 border-b border-white/10 flex items-center justify-between">
+            <div className="p-6 border-b border-[var(--border-soft)] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl border ${getThemeBadgeGlow()}`}>
                   <Settings size={22} className="animate-spin [animation-duration:6s]" />
                 </div>
                 <div>
-                  <h3 className="font-display font-medium text-lg tracking-tight text-white flex items-center gap-2">
+                  <h3 className="font-display font-medium text-lg tracking-tight text-[var(--text)] flex items-center gap-2">
                     Nuvi Configuration
-                    <Sparkles size={14} className="text-cyan-400" />
+                    <Sparkles size={14} className="text-[var(--accent)]" />
                   </h3>
-                  <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mt-0.5">
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-dim)] mt-0.5">
                     System settings &amp; preferences
                   </p>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Tab selector row — mirrors MemoryDashboard pill style */}
-            <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 overflow-x-auto">
+            <div className="px-6 py-4 border-b border-[var(--border-soft)] flex items-center gap-2 overflow-x-auto">
               {tabs.map((t) => {
                 const Icon = t.icon;
                 const active = activeTab === t.id;
@@ -203,8 +203,8 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                     onClick={() => setActiveTab(t.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono tracking-wider transition shrink-0 cursor-pointer ${
                       active
-                        ? "border-cyan-400 bg-cyan-400/10 text-cyan-300"
-                        : "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10"
+                        ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                        : "border-[var(--border-soft)] bg-[var(--bg-panel)] text-[var(--text-dim)] hover:bg-[var(--bg-hover)]"
                     }`}
                   >
                     <Icon size={12} />
@@ -219,7 +219,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
               {/* ---------------- GENERAL ---------------- */}
               {activeTab === "general" && (
                 <div className="space-y-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                     Startup &amp; Appearance
                   </div>
 
@@ -260,7 +260,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
               {/* ---------------- VOICE ---------------- */}
               {activeTab === "voice" && (
                 <div className="space-y-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                     Wake Word &amp; Microphone
                   </div>
 
@@ -272,7 +272,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                   />
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-mono tracking-wider text-slate-300 uppercase">
+                    <label className="block text-[10px] font-mono tracking-wider text-[var(--text)] uppercase">
                       Wake Phrase
                     </label>
                     <input
@@ -280,21 +280,21 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       value={settings.wakePhrase}
                       onChange={(e) => onChange({ wakePhrase: e.target.value })}
                       placeholder="hey nuvi"
-                      className="w-full px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white font-mono focus:outline-none focus:border-cyan-400/50 transition"
+                      className="w-full px-3 py-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] text-sm text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]/50 transition"
                     />
-                    <span className="text-[8px] text-slate-500 uppercase font-mono">
+                    <span className="text-[8px] text-[var(--text-faint)] uppercase font-mono">
                       Say this phrase to activate Nuvi
                     </span>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-mono tracking-wider text-slate-300 uppercase">
+                    <label className="block text-[10px] font-mono tracking-wider text-[var(--text)] uppercase">
                       Microphone
                     </label>
                     <select
                       value={settings.micDeviceId}
                       onChange={(e) => onChange({ micDeviceId: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white font-mono focus:outline-none focus:border-cyan-400/50 transition cursor-pointer"
+                      className="w-full px-3 py-2 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] text-sm text-[var(--text)] font-mono focus:outline-none focus:border-[var(--accent)]/50 transition cursor-pointer"
                     >
                       <option value="">System Default</option>
                       {mics.map((m, i) => (
@@ -303,7 +303,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                         </option>
                       ))}
                     </select>
-                    <span className="text-[8px] text-slate-500 uppercase font-mono">
+                    <span className="text-[8px] text-[var(--text-faint)] uppercase font-mono">
                       {mics.length === 0
                         ? "Grant mic permission to list devices"
                         : `${mics.length} device(s) detected`}
@@ -312,10 +312,10 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-mono tracking-wider text-slate-300 uppercase">
+                      <label className="block text-[10px] font-mono tracking-wider text-[var(--text)] uppercase">
                         Sensitivity
                       </label>
-                      <span className="text-[10px] font-mono text-cyan-300">
+                      <span className="text-[10px] font-mono text-[var(--accent)]">
                         {settings.sensitivity}
                       </span>
                     </div>
@@ -325,9 +325,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       max={100}
                       value={settings.sensitivity}
                       onChange={(e) => onChange({ sensitivity: Number(e.target.value) })}
-                      className="w-full accent-cyan-500 cursor-pointer"
+                      className="w-full accent-[var(--accent)] cursor-pointer"
                     />
-                    <span className="text-[8px] text-slate-500 uppercase font-mono">
+                    <span className="text-[8px] text-[var(--text-faint)] uppercase font-mono">
                       Higher = faster re-arm &amp; more matches
                     </span>
                   </div>
@@ -337,7 +337,7 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
               {/* ---------------- SYSTEM ---------------- */}
               {activeTab === "system" && (
                 <div className="space-y-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                     Desktop Control Agent
                   </div>
 
@@ -354,23 +354,23 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       }`}
                     />
                     <div className="flex-1">
-                      <div className="text-xs font-mono text-white">
+                      <div className="text-xs font-mono text-[var(--text)]">
                         {agentHealth.online ? "Agent Online" : "Agent Offline"}
                       </div>
-                      <div className="text-[10px] font-mono text-slate-400">
+                      <div className="text-[10px] font-mono text-[var(--text-dim)]">
                         {agentHealth.online
                           ? `${agentHealth.toolCount ?? 0} tools registered`
                           : "Start the Python agent on port 8765"}
                       </div>
                     </div>
-                    <Cpu size={16} className="text-slate-500" />
+                    <Cpu size={16} className="text-[var(--text-faint)]" />
                   </div>
 
-                  <div className="p-3 rounded-xl border border-white/5 bg-white/5 space-y-2">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                  <div className="p-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] space-y-2">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--text-dim)] uppercase tracking-wider">
                       <Volume2 size={12} /> Capabilities
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono text-slate-300">
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px] font-mono text-[var(--text)]">
                       <span className="inline-flex items-center gap-1"><Check size={10} className="text-emerald-400" /> App control</span>
                       <span className="inline-flex items-center gap-1"><Check size={10} className="text-emerald-400" /> Browser</span>
                       <span className="inline-flex items-center gap-1"><Check size={10} className="text-emerald-400" /> Volume</span>
@@ -387,31 +387,31 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
               {/* ---------------- ABOUT ---------------- */}
               {activeTab === "about" && (
                 <div className="space-y-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                     About Nuvi
                   </div>
 
-                  <div className="p-4 rounded-xl border border-white/5 bg-white/5 space-y-3">
+                  <div className="p-4 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)] space-y-3">
                     <div className="flex items-center gap-2">
-                      <Info size={14} className="text-cyan-400" />
-                      <span className="text-sm font-display text-white">NUVI AI Assistant</span>
+                      <Info size={14} className="text-[var(--accent)]" />
+                      <span className="text-sm font-display text-[var(--text)]">NUVI AI Assistant</span>
                     </div>
-                    <div className="space-y-1.5 text-[10px] font-mono text-slate-400">
+                    <div className="space-y-1.5 text-[10px] font-mono text-[var(--text-dim)]">
                       <div className="flex justify-between">
                         <span>VERSION</span>
-                        <span className="text-slate-300">V2.0.0</span>
+                        <span className="text-[var(--text)]">V2.0.0</span>
                       </div>
                       <div className="flex justify-between">
                         <span>ENGINE</span>
-                        <span className="text-slate-300">Gemini Live</span>
+                        <span className="text-[var(--text)]">Gemini Live</span>
                       </div>
                       <div className="flex justify-between">
                         <span>DESKTOP</span>
-                        <span className="text-slate-300">FastAPI Agent</span>
+                        <span className="text-[var(--text)]">FastAPI Agent</span>
                       </div>
                       <div className="flex justify-between">
                         <span>WAKE WORD</span>
-                        <span className="text-slate-300">Web Speech API</span>
+                        <span className="text-[var(--text)]">Web Speech API</span>
                       </div>
                     </div>
                   </div>
@@ -428,11 +428,11 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
             </div>
 
             {/* Footer status bar — mirrors MemoryDashboard */}
-            <div className="px-6 py-3 border-t border-white/5 bg-white/5 flex items-center justify-between">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+            <div className="px-6 py-3 border-t border-[var(--border-soft)] bg-[var(--bg-panel)] flex items-center justify-between">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                 Preferences auto-save
               </span>
-              <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-[var(--text-faint)]">
                 Nuvi V2
               </span>
             </div>

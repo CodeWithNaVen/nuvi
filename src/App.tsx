@@ -554,11 +554,13 @@ export default function App() {
     if (!t) return;
     setTextInput("");
     addChatMsg("user", t);
-    // If live is connected, the typed text is not directly sent via live; we use a fallback POST to /api/proxy style?
-    // For now, push as a tool-like message and also try to send via websocket if available.
-    // The reference Nuvi used a separate WS for text; here we keep minimal: show in chat.
-    // Future: integrate text chat via live session text input if Gemini supports it.
     setTimeout(() => transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    // When live is active, route chat through Gemini Live so Nuvi talks + texts back
+    const sent = sessionRef.current?.sendTextMessage(t) ?? false;
+    if (!sent) {
+      // Offline: queue as visual-only and nudge user to activate voice
+      addChatMsg("assistant", "I'm offline right now - tap the orb to wake me and I'll reply with voice too!");
+    }
   };
 
   const orbState: "idle" | "listening" | "thinking" | "speaking" =
@@ -593,7 +595,7 @@ export default function App() {
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-[var(--border-soft)] bg-[var(--bg-elevated)] px-4">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]" />
-          <span className="font-mono text-xs tracking-[0.32em] text-[var(--text-dim)]">NUVI</span>
+          <span className="font-mono text-xs tracking-[0.32em] text-[var(--text-dim)]">NUVI AI</span>
           <span className={`ml-2 h-1.5 w-1.5 rounded-full ${liveState !== "disconnected" ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)] animate-pulse" : "bg-white/10"}`} />
         </div>
         <div className="flex items-center gap-1">
@@ -946,6 +948,9 @@ export default function App() {
               <button onClick={() => setShowSettings(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--accent)] px-4 py-2.5 font-mono text-sm font-semibold text-white hover:brightness-110">
                 <SettingsIcon size={14} /> Open Advanced Settings
               </button>
+              <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-panel)]/60 p-3 text-center font-mono text-[10px] leading-relaxed tracking-wide text-[var(--text-faint)]">
+                Developed with <span className="text-[var(--accent)]">♥</span> by <span className="font-semibold text-[var(--text)]">Naveen Shah and his team</span>
+              </div>
             </div>
           )}
 
@@ -997,8 +1002,10 @@ export default function App() {
       <MemoryDashboard isOpen={showMemoryDashboard} onClose={() => setShowMemoryDashboard(false)} memories={memories} onAddMemory={handleAddMemory} onDeleteMemory={handleDeleteMemory} themeColor={themeColor} />
       <SettingsPanel isOpen={showSettings} onClose={() => setShowSettings(false)} settings={settings} onChange={handleSettingsChange} themeColor={themeColor} />
 
-      {/* Keyboard: space toggles */}
-      <div className="sr-only" aria-hidden />
+      {/* Footer - Developer credit */}
+      <div className="shrink-0 border-t border-[var(--border-soft)] bg-[var(--bg-elevated)] px-4 py-2 text-center font-mono text-[10px] tracking-widest text-[var(--text-faint)]">
+        Developed by <span className="font-semibold text-[var(--text-dim)]">Naveen Shah and his team</span> · Nuvi v1.0.1
+      </div>
     </div>
   );
 }

@@ -124,6 +124,19 @@ export class NuviAudioSession {
     }
   }
 
+  public sendTextMessage(text: string): boolean {
+    if (!text.trim()) return false;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentState !== "disconnected") {
+      this.ws.send(JSON.stringify({ type: "text", text: text.trim() }));
+      return true;
+    }
+    return false;
+  }
+
+  public isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN && this.currentState !== "disconnected";
+  }
+
   // Requests microphone and creates connections
   public async connect() {
     if (this.isActivated) return;

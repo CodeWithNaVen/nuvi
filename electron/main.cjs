@@ -22,6 +22,11 @@ const http = require('http');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch { /* updater not available in dev without install */ }
+
 // --- Constants -------------------------------------------------------------
 const SERVER_PORT = 3000;
 const SERVER_ORIGIN = `http://localhost:${SERVER_PORT}`;
@@ -258,6 +263,32 @@ function createMainWindow() {
 // ---------------------------------------------------------------------------
 // Bootstrap sequence
 // ---------------------------------------------------------------------------
+function setupAutoUpdater() {
+  if (!autoUpdater || !app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-available', (info) => {
+    console.log(`[Updater] Update available: ${info.version}`);
+    if (mainWindow) mainWindow.webContents.send('nuvi:update-available', info);
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`[Updater] Downloaded ${info.version}, will install on quit`);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Nuvi Update Ready',
+      message: `Nuvi ${info.version} downloaded. Restart to install?`,
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) { isQuitting = true; autoUpdater.quitAndInstall(); }
+    });
+  });
+  autoUpdater.on('error', (e) => console.warn('[Updater] error', e?.message || e));
+  // check 5s after boot, then every 4h
+  setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(()=>{}), 5000);
+  setInterval(() => autoUpdater.checkForUpdatesAndNotify().catch(()=>{}), 4 * 60 * 60 * 1000);
+}
+
 async function bootstrap() {
   app.setAppUserModelId('com.nuvi.desktop');
   createSplashWindow();
@@ -266,6 +297,7 @@ async function bootstrap() {
     startBackend();
     await waitForBackend(SERVER_READY_TIMEOUT_MS);
     createMainWindow();
+    setupAutoUpdater();
   } catch (err) {
     if (splashWindow) splashWindow.close();
     dialog.showErrorBox(
