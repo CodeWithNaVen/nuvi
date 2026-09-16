@@ -1677,37 +1677,33 @@ export async function createApp() {
   return { app, server, wss };
 }
 
-async function findAvailablePort(preferred: number): Promise<number> {
-  const net = await import("net");
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.listen(preferred, "127.0.0.1", () => {
-      server.close(() => resolve(preferred));
-    });
-    server.on("error", () => {
-      // Port in use — try the next one (up to 10 attempts)
-      if (preferred < 3010) {
-        findAvailablePort(preferred + 1).then(resolve);
-      } else {
-        resolve(preferred); // last resort: let it fail with the preferred port
-      }
-    });
-  });
-}
-
 async function startServer() {
   const preferred = parseInt(process.env.PORT || process.env.NUVI_PORT || "3000", 10);
-  const PORT = await findAvailablePort(preferred);
   const { app, server } = await createApp();
-  server.listen(PORT, "127.0.0.1", () => {
-    logStartup(`NUVI V2 server started on http://localhost:${PORT}`);
-    console.log(`[Server] Running on http://localhost:${PORT}`);
-    if (!process.env.VERCEL) {
-      ensureDesktopAgent().catch((e) =>
-        console.warn(`[Desktop Agent] Boot probe failed: ${e?.message || e}`)
-      );
-    }
-  });
+
+  // Try to listen on the preferred port; if occupied, try the next one (up to 3010).
+  const tryListen = (port: number) => {
+    server.listen(port, "127.0.0.1", () => {
+      logStartup(`NUVI V2 server started on http://localhost:${port}`);
+      console.log(`[Server] Running on http://localhost:${port}`);
+      if (!process.env.VERCEL) {
+        ensureDesktopAgent().catch((e) =>
+          console.warn(`[Desktop Agent] Boot probe failed: ${e?.message || e}`)
+        );
+      }
+    });
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE" && port < 3010) {
+        console.warn(`[Server] Port ${port} in use, trying ${port + 1}...`);
+        tryListen(port + 1);
+      } else {
+        console.error(`[Server] Failed to bind to port ${port}: ${err.message}`);
+        process.exit(1);
+      }
+    });
+  };
+
+  tryListen(preferred);
 }
 
 // Only auto-start when not imported by Vercel serverless handler

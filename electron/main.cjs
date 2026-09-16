@@ -170,12 +170,14 @@ function waitForBackend(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
-      const req = http.get(SERVER_ORIGIN, (res) => {
+      // Use /api/config — a JSON endpoint unique to the Nuvi backend.
+      // Avoids matching another app that may be on the same port.
+      const req = http.get(`${SERVER_ORIGIN}/api/config`, (res) => {
         let body = '';
         res.on('data', (chunk) => { body += chunk; });
         res.on('end', () => {
-          // Verify this is actually the Nuvi backend, not some other app on the same port
-          if (body.includes('nuvi-backend') || body.includes('nuvi')) {
+          // /api/config returns {"hasApiKey":...} — verify it's actually Nuvi
+          if (body.includes('hasApiKey')) {
             resolve();
           } else if (Date.now() > deadline) {
             reject(new Error('Backend did not become ready in time.'));
