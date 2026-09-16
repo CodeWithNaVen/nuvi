@@ -74,6 +74,7 @@
       "electron/**/*",
       "assets/**/*",
       "public/**/*",
+      "desktop_agent/**/*",
       "package.json"
     ],
     "extraResources": [
