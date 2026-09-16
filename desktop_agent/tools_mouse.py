@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 
 def _require_pyautogui():

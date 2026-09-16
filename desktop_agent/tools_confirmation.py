@@ -15,7 +15,7 @@ import secrets
 import time
 from typing import Any, Dict
 
-from .registry import STATE, ToolError, register
+from desktop_agent.registry import STATE, ToolError, register
 
 # Actions that can ONLY run after explicit confirmation.
 DANGEROUS_ACTIONS = {"shutdown", "restart", "sleep", "lock"}

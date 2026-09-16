@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 
 def _press_copy() -> None:

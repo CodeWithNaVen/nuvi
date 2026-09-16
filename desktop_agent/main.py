@@ -23,8 +23,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import __version__
-from .registry import DESKTOP_TOOL_NAMES, TOOLS, ToolError, load_all
+from desktop_agent import __version__
+from desktop_agent.registry import DESKTOP_TOOL_NAMES, TOOLS, ToolError, load_all
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     yield
     # Clean shutdown of the Playwright browser if it was started.
     try:
-        from .tools_browser import shutdown_browser
+        from desktop_agent.tools_browser import shutdown_browser
 
         shutdown_browser()
     except Exception as e:  # noqa: BLE001

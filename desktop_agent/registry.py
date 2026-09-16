@@ -182,7 +182,7 @@ _MODULE_NAMES = [
 
 def load_all() -> None:
     for mod_name in _MODULE_NAMES:
-        importlib.import_module(f".{mod_name}", package="desktop_agent")
+        importlib.import_module(f"desktop_agent.{mod_name}")
 
 
 __all__ = ["TOOLS", "STATE", "DESKTOP_TOOL_NAMES", "ToolError", "register", "load_all"]

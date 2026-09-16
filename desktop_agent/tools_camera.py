@@ -31,7 +31,7 @@ try:
 except Exception:  # pragma: no cover
     np = None
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 
 def _find_tesseract_exe() -> Optional[str]:

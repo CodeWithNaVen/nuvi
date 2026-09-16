@@ -22,7 +22,7 @@ import os
 import sys
 from typing import Any, Dict
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 RUN_KEY_PATH = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 VALUE_NAME = "Nuvi"

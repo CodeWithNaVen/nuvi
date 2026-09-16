@@ -21,8 +21,8 @@ import subprocess
 import time
 from typing import Any, Dict, Optional
 
-from .registry import ToolError, register
-from .tools_confirmation import ACTION_LABEL, consume_token
+from desktop_agent.registry import ToolError, register
+from desktop_agent.tools_confirmation import ACTION_LABEL, consume_token
 
 
 # --- Volume backend (lazy) ----------------------------------------------------
@@ -223,7 +223,7 @@ def execute_power_action(args: Dict[str, Any]) -> Dict[str, Any]:
 
     # Locking is comparatively safe but still gated per the user's spec
     # (all four dangerous actions require confirmation).
-    from .tools_confirmation import DANGEROUS_ACTIONS
+    from desktop_agent.tools_confirmation import DANGEROUS_ACTIONS
 
     if action not in DANGEROUS_ACTIONS:
         raise ToolError(

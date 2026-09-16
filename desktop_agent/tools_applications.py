@@ -17,7 +17,7 @@ import subprocess
 import time
 from typing import Any, Dict
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 # Canonical app key -> (launch_command, kind)
 #   kind == "exe"   : launch_command is the executable name (resolved via PATH/App Paths)

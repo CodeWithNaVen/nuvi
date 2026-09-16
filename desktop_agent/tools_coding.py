@@ -20,8 +20,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .registry import ToolError, register
-from .tools_files import _ensure_safe
+from desktop_agent.registry import ToolError, register
+from desktop_agent.tools_files import _ensure_safe
 
 
 # Extension map for writeCodeFile.

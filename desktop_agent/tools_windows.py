@@ -12,7 +12,7 @@ import subprocess
 import time
 from typing import Any, Dict, Optional
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 SW_MINIMIZE = 6
 SW_MAXIMIZE = 3

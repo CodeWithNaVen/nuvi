@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .registry import ToolError, register
+from desktop_agent.registry import ToolError, register
 
 SCREENSHOTS_DIR = Path(os.path.expanduser("~")) / "Pictures" / "NuviScreenshots"
 
