@@ -2,7 +2,7 @@
   "name": "nuvi",
   "productName": "Nuvi",
   "private": false,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Nuvi - Jarvis-like agentic desktop assistant by Naveen Shah and team",
   "author": "Naveen Shah and team <naveen@nuvi.ai>",
   "type": "module",
@@ -63,7 +63,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "naveen-shah",
+        "owner": "CodeWithNaVen",
         "repo": "nuvi",
         "private": true
       }

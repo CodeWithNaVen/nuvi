@@ -161,7 +161,7 @@ export default function Page() {
                 if (data.result) setCameraResult(data.result);
                 callback({ result: data.result });
               } else {
-                if (String(data.error||'').toLowerCase().includes('not running') && b64) {
+                if (String(data.error||'').toLowerCase().includes('not run') && b64) {
                   const fallback = { result: 'Browser preview only (desktop agent offline)', image_base64: b64 };
                   setCameraResult(fallback); callback({ result: fallback });
                 } else callback({ error: data.error || 'Camera failed' });
@@ -221,7 +221,7 @@ export default function Page() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        if (String(data.error||'').toLowerCase().includes('not running') && b64) {
+        if (String(data.error||'').toLowerCase().includes('not run') && b64) {
           setCameraResult({ result: 'Mobile preview only (desktop agent offline)', image_base64: b64 });
           setCameraStatus('Visible (mobile-only)');
           return;

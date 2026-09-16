@@ -76,6 +76,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
     toolCount?: number;
     cpu?: string;
     ram?: string;
+    isElectron?: boolean;
+    lastError?: string | null;
+    spawnMethod?: string | null;
   }>({ online: false });
 
   // Enumerate microphones (mirrors how audio.ts grabs getUserMedia).
@@ -98,28 +101,23 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
     if (!isOpen) return;
     const probe = async () => {
       try {
-        // Re-use the local agent directly (same machine, same browser).
-        const res = await fetch("http://127.0.0.1:8765/health", { cache: "no-store" });
-        if (!res.ok) {
-          setAgentHealth({ online: false });
+        // Use the server proxy which returns full diagnostics
+        const res = await fetch(apiUrl("/api/agent-health"), { cache: "no-store" });
+        if (res.ok) {
+          const d = await res.json();
+          setAgentHealth({
+            online: !!d.online,
+            toolCount: d.tool_count,
+            isElectron: d.isElectron,
+            lastError: d.lastError,
+            spawnMethod: d.spawnMethod,
+          });
           return;
         }
-        const data = await res.json();
-        setAgentHealth({ online: true, toolCount: data.tool_count });
       } catch {
-        // Cross-origin may fail; try the server proxy (Vercel or same-origin) as fallback.
-        try {
-          const res2 = await fetch(apiUrl("/api/agent-health"), { cache: "no-store" });
-          if (res2.ok) {
-            const d = await res2.json();
-            setAgentHealth({ online: !!d.online, toolCount: d.tool_count });
-            return;
-          }
-        } catch {
-          /* ignore */
-        }
-        setAgentHealth({ online: false });
+        /* ignore */
       }
+      setAgentHealth({ online: false });
     };
     probe();
     const id = setInterval(probe, 5000);
@@ -360,7 +358,9 @@ export function SettingsPanel({ isOpen, onClose, settings, onChange, themeColor 
                       <div className="text-[10px] font-mono text-[var(--text-dim)]">
                         {agentHealth.online
                           ? `${agentHealth.toolCount ?? 0} tools registered`
-                          : "Start the Python agent on port 8765"}
+                          : agentHealth.isElectron
+                            ? "Restart NUVI to try again"
+                            : "Start the Python agent on port 8765"}
                       </div>
                     </div>
                     <Cpu size={16} className="text-[var(--text-faint)]" />

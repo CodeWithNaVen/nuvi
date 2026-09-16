@@ -28,8 +28,9 @@ try {
 } catch { /* updater not available in dev without install */ }
 
 // --- Constants -------------------------------------------------------------
-const SERVER_PORT = 3000;
-const SERVER_ORIGIN = `http://localhost:${SERVER_PORT}`;
+const DEFAULT_PORT = 3000;
+let SERVER_PORT = DEFAULT_PORT;
+let SERVER_ORIGIN = `http://localhost:${SERVER_PORT}`;
 const SERVER_READY_TIMEOUT_MS = 40_000;
 
 // In development we run from the repo root; when packaged the app files live in
@@ -99,6 +100,9 @@ function startBackend() {
   };
   if (fs.existsSync(agentExe)) {
     env.NUVI_AGENT_EXE = agentExe;
+    console.log(`[Nuvi] Desktop agent exe found: ${agentExe}`);
+  } else {
+    console.warn(`[Nuvi] Desktop agent exe NOT found at: ${agentExe} — desktop tools will rely on auto-detection at runtime.`);
   }
 
   serverProcess = spawn(process.execPath, [SERVER_ENTRY], {
@@ -108,7 +112,30 @@ function startBackend() {
     windowsHide: true,
   });
 
-  serverProcess.stdout?.on('data', (d) => process.stdout.write(`[server] ${d}`));
+  // Parse actual port from server stdout (it picks a free port if 3000 is occupied)
+  const portPromise = new Promise((resolve) => {
+    let resolved = false;
+    serverProcess.stdout?.on('data', (d) => {
+      const text = d.toString();
+      process.stdout.write(`[server] ${text}`);
+      if (!resolved) {
+        const match = text.match(/localhost:(\d+)/);
+        if (match) {
+          const detected = parseInt(match[1], 10);
+          if (detected && detected !== SERVER_PORT) {
+            SERVER_PORT = detected;
+            SERVER_ORIGIN = `http://localhost:${SERVER_PORT}`;
+            console.log(`[Nuvi] Server started on alternative port ${SERVER_PORT}`);
+          }
+          resolved = true;
+          resolve();
+        }
+      }
+    });
+    // Fallback: resolve after 3s even if no port detected (server might not log it)
+    setTimeout(() => { if (!resolved) { resolved = true; resolve(); } }, 3000);
+  });
+
   serverProcess.stderr?.on('data', (d) => process.stderr.write(`[server] ${d}`));
   serverProcess.on('exit', (code, signal) => {
     if (!isQuitting) {
@@ -119,8 +146,9 @@ function startBackend() {
       app.quit();
     }
   });
-}
 
+  return portPromise;
+}
 function stopBackend() {
   if (serverProcess && !serverProcess.killed) {
     try {
@@ -137,14 +165,24 @@ function stopBackend() {
   serverProcess = null;
 }
 
-/** Poll the backend until it answers, or reject on timeout. */
+/** Poll the backend until it answers with a Nuvi-specific response, or reject on timeout. */
 function waitForBackend(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const tryOnce = () => {
       const req = http.get(SERVER_ORIGIN, (res) => {
-        res.resume();
-        resolve();
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          // Verify this is actually the Nuvi backend, not some other app on the same port
+          if (body.includes('nuvi-backend') || body.includes('nuvi')) {
+            resolve();
+          } else if (Date.now() > deadline) {
+            reject(new Error('Backend did not become ready in time.'));
+          } else {
+            setTimeout(tryOnce, 400);
+          }
+        });
       });
       req.on('error', () => {
         if (Date.now() > deadline) {
@@ -294,7 +332,7 @@ async function bootstrap() {
   createSplashWindow();
 
   try {
-    startBackend();
+    await startBackend(); // waits for port detection
     await waitForBackend(SERVER_READY_TIMEOUT_MS);
     createMainWindow();
     setupAutoUpdater();

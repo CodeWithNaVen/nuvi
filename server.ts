@@ -99,12 +99,23 @@ const DESKTOP_TOOLS: ReadonlySet<string> = new Set([
 let desktopAgentVerified = false;
 
 /**
+ * Track the last spawn attempt outcome for diagnostics.
+ */
+let lastAgentSpawnError: string | null = null;
+let lastAgentSpawnMethod: string | null = null;
+let agentSpawnAttempts = 0;
+const MAX_SPAWN_ATTEMPTS = 3;
+
+/**
  * Auto-spawn the Python desktop agent as a detached child process if it is not
  * already listening. Looks for the project's bundled Python interpreter first,
  * falling back to `python` / `python3` on PATH. Runs detached so it survives
  * even if NUVI's node process is killed.
+ *
+ * Returns true if a process was successfully spawned (does NOT guarantee it
+ * will stay alive — callers should poll /health).
  */
-function spawnDesktopAgent(): void {
+function spawnDesktopAgent(): boolean {
   const agentEnv = {
     ...process.env,
     NUVI_AGENT_HOST: "127.0.0.1",
@@ -113,21 +124,40 @@ function spawnDesktopAgent(): void {
 
   // Preferred path (packaged app): a PyInstaller-frozen agent exe that embeds
   // its own Python runtime. Set by the Electron main process via NUVI_AGENT_EXE.
-    const frozenExe = process.env.NUVI_AGENT_EXE;
+  const frozenExe = process.env.NUVI_AGENT_EXE;
   if (frozenExe && fs.existsSync(frozenExe)) {
     try {
       const child = spawn(frozenExe, [], {
         cwd: path.dirname(frozenExe),
         detached: true,
-        stdio: "ignore",
-        windowsHide: true, // never flash a console window
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
         env: agentEnv,
       });
+      lastAgentSpawnMethod = "frozen";
+      lastAgentSpawnError = null;
+
+      // Capture crash output for diagnostics
+      let stderrBuf = "";
+      child.stderr?.on("data", (d: Buffer) => { stderrBuf += d.toString(); });
+      child.on("error", (e: Error) => {
+        lastAgentSpawnError = `spawn error: ${e.message}`;
+        logError(`AGENT_SPAWN_FROZEN_ERROR pid=${child.pid}: ${e.message}`);
+      });
+      child.on("exit", (code: number | null, signal: string | null) => {
+        if (code !== 0 && code !== null) {
+          lastAgentSpawnError = `exited with code ${code}${signal ? ` (signal ${signal})` : ""}`;
+          if (stderrBuf.trim()) lastAgentSpawnError += `: ${stderrBuf.trim().substring(0, 300)}`;
+          logError(`AGENT_SPAWN_FROZEN_DIED pid=${child.pid} code=${code} signal=${signal}: ${stderrBuf.trim().substring(0, 300)}`);
+        }
+      });
+
       child.unref();
       logStartup(`AGENT_SPAWN frozen exe pid=${child.pid} path=${frozenExe}`);
       console.log(`[Desktop Agent] Launched frozen agent (PID ${child.pid}).`);
-      return;
+      return true;
     } catch (e: any) {
+      lastAgentSpawnError = `spawn exception: ${e?.message || e}`;
       logError(`AGENT_SPAWN_FROZEN_FAILED: ${e?.message || e}`);
       // fall through to the Python path below
     }
@@ -149,22 +179,43 @@ function spawnDesktopAgent(): void {
     }
   });
   if (!py) {
+    lastAgentSpawnError = "no Python interpreter found";
     console.warn("[Desktop Agent] No frozen agent and no Python interpreter found; desktop control unavailable.");
     logError("AGENT_SPAWN_NO_RUNTIME: neither NUVI_AGENT_EXE nor Python available");
-    return;
+    return false;
   }
   try {
     const child = spawn(
       py,
       ["-m", "uvicorn", "desktop_agent.main:app", "--host", "127.0.0.1", "--port", "8765"],
-      { cwd: process.cwd(), detached: true, stdio: "ignore", windowsHide: true, env: agentEnv }
+      { cwd: process.cwd(), detached: true, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: agentEnv }
     );
+    lastAgentSpawnMethod = "python";
+    lastAgentSpawnError = null;
+
+    let stderrBuf = "";
+    child.stderr?.on("data", (d: Buffer) => { stderrBuf += d.toString(); });
+    child.on("error", (e: Error) => {
+      lastAgentSpawnError = `spawn error: ${e.message}`;
+      logError(`AGENT_SPAWN_PYTHON_ERROR pid=${child.pid}: ${e.message}`);
+    });
+    child.on("exit", (code: number | null, signal: string | null) => {
+      if (code !== 0 && code !== null) {
+        lastAgentSpawnError = `exited with code ${code}${signal ? ` (signal ${signal})` : ""}`;
+        if (stderrBuf.trim()) lastAgentSpawnError += `: ${stderrBuf.trim().substring(0, 300)}`;
+        logError(`AGENT_SPAWN_PYTHON_DIED pid=${child.pid} code=${code} signal=${signal}: ${stderrBuf.trim().substring(0, 300)}`);
+      }
+    });
+
     child.unref();
     logStartup(`AGENT_SPAWN python pid=${child.pid}`);
     console.log(`[Desktop Agent] Auto-spawned via Python (PID ${child.pid}).`);
+    return true;
   } catch (e: any) {
+    lastAgentSpawnError = `spawn exception: ${e?.message || e}`;
     console.warn(`[Desktop Agent] Auto-spawn failed: ${e?.message || e}`);
     logError(`AGENT_SPAWN_PYTHON_FAILED: ${e?.message || e}`);
+    return false;
   }
 }
 
@@ -185,26 +236,64 @@ async function isDesktopAgentAlive(): Promise<boolean> {
 
 /**
  * Ensure the desktop agent is running. If not verified yet, probe health; if
- * down, auto-spawn and poll until it is ready (or timeout).
+ * down, auto-spawn and poll until it is ready (or timeout). Retries up to
+ * MAX_SPAWN_ATTEMPTS times if the spawned process dies during the wait.
  */
 async function ensureDesktopAgent(): Promise<void> {
   if (desktopAgentVerified) return;
   if (await isDesktopAgentAlive()) {
     desktopAgentVerified = true;
-      console.log(`[Desktop Agent] Already running — ${DESKTOP_TOOLS.size} tools available.`);
+    agentSpawnAttempts = 0;
+    console.log(`[Desktop Agent] Already running — ${DESKTOP_TOOLS.size} tools available.`);
     return;
   }
-  console.log("[Desktop Agent] Not detected. Auto-starting...");
-  spawnDesktopAgent();
-  for (let i = 1; i <= 20; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    if (await isDesktopAgentAlive()) {
-      desktopAgentVerified = true;
-      console.log(`[Desktop Agent] Online after ${i}s — ${DESKTOP_TOOLS.size} tools available.`);
-      return;
+
+  for (let attempt = 1; attempt <= MAX_SPAWN_ATTEMPTS; attempt++) {
+    if (desktopAgentVerified) return; // another path may have verified it
+
+    console.log(`[Desktop Agent] Not detected. Auto-starting (attempt ${attempt}/${MAX_SPAWN_ATTEMPTS})...`);
+    agentSpawnAttempts = attempt;
+    const spawned = spawnDesktopAgent();
+    if (!spawned) {
+      console.warn(`[Desktop Agent] Could not spawn agent process (attempt ${attempt}).`);
+      if (attempt < MAX_SPAWN_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      continue;
     }
+
+    // Poll for up to 15s per attempt
+    for (let i = 1; i <= 15; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (await isDesktopAgentAlive()) {
+        desktopAgentVerified = true;
+        agentSpawnAttempts = 0;
+        console.log(`[Desktop Agent] Online after ${i}s (attempt ${attempt}) — ${DESKTOP_TOOLS.size} tools available.`);
+        return;
+      }
+    }
+    console.warn(`[Desktop Agent] Agent did not come online in 15s (attempt ${attempt}).`);
   }
-  console.warn("[Desktop Agent] Did not come online within 20s. Desktop control will be unavailable.");
+
+  // All attempts exhausted
+  console.warn("[Desktop Agent] Failed to start after all attempts. Desktop control will be unavailable.");
+  logError(`AGENT_STARTUP_FAILED: all ${MAX_SPAWN_ATTEMPTS} attempts exhausted. Last error: ${lastAgentSpawnError || "unknown"}`);
+}
+
+/**
+ * Return diagnostic info about the desktop agent for the health endpoint.
+ */
+function getAgentDiagnostics(): Record<string, unknown> {
+  return {
+    verified: desktopAgentVerified,
+    spawnMethod: lastAgentSpawnMethod,
+    lastError: lastAgentSpawnError,
+    spawnAttempts: agentSpawnAttempts,
+    exePath: process.env.NUVI_AGENT_EXE || null,
+    exeExists: process.env.NUVI_AGENT_EXE ? fs.existsSync(process.env.NUVI_AGENT_EXE) : false,
+    isElectron: process.env.NUVI_LAUNCHED_BY === "electron",
+    toolCount: DESKTOP_TOOLS.size,
+  };
 }
 
 function mapToRealDesktopTool(name: string, args: Record<string, unknown>): { name: string; args: Record<string, unknown> } | null {
@@ -272,9 +361,16 @@ async function callDesktopAgent(
     return await res.json();
   } catch (err: any) {
     desktopAgentVerified = false; // mark stale so next call retries the spawn
-    const msg = err?.name === "AbortError"
-      ? "Desktop agent timed out."
-      : "Desktop agent is not running. Start it with: uvicorn desktop_agent.main:app --port 8765";
+    const isPackaged = process.env.NUVI_LAUNCHED_BY === "electron";
+    let msg: string;
+    if (err?.name === "AbortError") {
+      msg = "Desktop agent timed out. The command took too long to respond.";
+    } else if (isPackaged) {
+      const detail = lastAgentSpawnError ? ` (${lastAgentSpawnError})` : "";
+      msg = `Desktop agent is not responding. Restart NUVI to try again.${detail}`;
+    } else {
+      msg = "Desktop agent is not running. Start it with: uvicorn desktop_agent.main:app --port 8765";
+    }
     logError(`AGENT_UNREACHABLE ${tool}: ${msg}`);
     return { ok: false, error: msg };
   }
@@ -472,12 +568,12 @@ export async function createApp() {
       clearTimeout(timer);
       if (r.ok) {
         const d = await r.json();
-        res.json({ online: true, tool_count: d.tool_count });
+        res.json({ online: true, tool_count: d.tool_count, ...getAgentDiagnostics() });
       } else {
-        res.json({ online: false });
+        res.json({ online: false, ...getAgentDiagnostics() });
       }
     } catch {
-      res.json({ online: false });
+      res.json({ online: false, ...getAgentDiagnostics() });
     }
   });
 
@@ -910,7 +1006,7 @@ export async function createApp() {
         "   - For browser tasks, always launch the website in the user’s default browser and then use screen-aware desktop tools such as clickText, moveMouse, scrollMouse, and pasteClipboard for interaction. Do not open a separate test browser for normal user requests.\n" +
         "   - CODING ASSISTANCE: Use 'createPythonFile', 'writeCodeFile' (any language), 'createProjectFolder' (with subfolders), 'runPythonScript' (captures output). Example: 'Create and run a hello world Python script' -> createPythonFile then runPythonScript, then read back the output naturally.\n" +
         "   - SYSTEM INFORMATION: Use 'systemInfo' (CPU/RAM/disk/uptime), 'gpuInfo' (NVIDIA stats), 'temperatureInfo' to answer 'How is my CPU usage?' or 'What's my GPU temperature?'.\n" +
-        "   - CRITICAL: Always describe what you're doing in your warm, in-character voice WHILE the tool runs. If a desktop tool returns an error (especially 'Desktop agent is not running'), gently tell <USER> that the desktop control agent needs to be started (uvicorn desktop_agent.main:app --port 8765). Chain multi-step desktop plans naturally without waiting between steps.\n" +
+        "   - CRITICAL: Always describe what you're doing in your warm, in-character voice WHILE the tool runs. If a desktop tool returns an error (especially 'Desktop agent is not running' or 'not responding'), gently tell <USER> that the desktop control agent needs to restart — suggest they close and reopen NUVI, or say 'Let me try that again' and wait a moment before retrying. Do NOT mention uvicorn, Python, or command-line instructions to the user. Chain multi-step desktop plans naturally without waiting between steps.\n" +
         "11. BRIGHTNESS & AUTO-START (V2):\n" +
         "   - BRIGHTNESS: Use 'brightnessUp', 'brightnessDown', 'setBrightness' when the user asks to change screen brightness. Respond naturally: 'Alright, I've turned up the brightness for you.'\n" +
         "   - AUTO-START: Use 'enableAutoStart' when the user wants NUVI to start with Windows, 'disableAutoStart' to remove it, 'getAutoStartStatus' to check. Explain what you're doing.\n" +
@@ -1581,10 +1677,29 @@ export async function createApp() {
   return { app, server, wss };
 }
 
+async function findAvailablePort(preferred: number): Promise<number> {
+  const net = await import("net");
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(preferred, "127.0.0.1", () => {
+      server.close(() => resolve(preferred));
+    });
+    server.on("error", () => {
+      // Port in use — try the next one (up to 10 attempts)
+      if (preferred < 3010) {
+        findAvailablePort(preferred + 1).then(resolve);
+      } else {
+        resolve(preferred); // last resort: let it fail with the preferred port
+      }
+    });
+  });
+}
+
 async function startServer() {
-  const PORT = parseInt(process.env.PORT || process.env.NUVI_PORT || "3000", 10);
+  const preferred = parseInt(process.env.PORT || process.env.NUVI_PORT || "3000", 10);
+  const PORT = await findAvailablePort(preferred);
   const { app, server } = await createApp();
-  server.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "127.0.0.1", () => {
     logStartup(`NUVI V2 server started on http://localhost:${PORT}`);
     console.log(`[Server] Running on http://localhost:${PORT}`);
     if (!process.env.VERCEL) {

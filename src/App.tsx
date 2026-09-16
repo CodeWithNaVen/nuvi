@@ -410,7 +410,7 @@ export default function App() {
       }
       if (!response || !response.ok || !data.ok) {
         // Web without desktop agent: graceful browser-only fallback
-        if (!data?.ok && String(data?.error || "").toLowerCase().includes("not running") && browserB64) {
+        if (!data?.ok && String(data?.error || "").toLowerCase().includes("not run") && browserB64) {
           setCameraResult({ result: "Browser preview only (desktop agent offline). Live video is streaming to Gemini.", image_base64: browserB64 });
           setCameraStatus(mode === "analyze" ? "Scene visible (browser-only)" : "Text capture (browser-only)");
           return;
@@ -514,7 +514,7 @@ export default function App() {
                 callback({ result: data.result });
               } else {
                 // Browser-only fallback when agent unavailable but we have a frame
-                if (String(data?.error || "").toLowerCase().includes("not running") && b64) {
+                if (String(data?.error || "").toLowerCase().includes("not run") && b64) {
                   const fallback = { result: "Captured browser frame (desktop agent offline – preview is live).", image_base64: b64, camera_id: 0 } as any;
                   setCameraResult(fallback);
                   setCameraStatus("Camera frame captured (browser-only)");
