@@ -108,12 +108,9 @@ const MAX_SPAWN_ATTEMPTS = 3;
 
 /**
  * Auto-spawn the Python desktop agent as a detached child process if it is not
- * already listening. Looks for the project's bundled Python interpreter first,
- * falling back to `python` / `python3` on PATH. Runs detached so it survives
- * even if NUVI's node process is killed.
+ * already listening. Tries the frozen exe first, then falls back to Python source.
  *
- * Returns true if a process was successfully spawned (does NOT guarantee it
- * will stay alive — callers should poll /health).
+ * Returns true if a process was successfully spawned and appears healthy.
  */
 function spawnDesktopAgent(): boolean {
   const agentEnv = {
@@ -122,48 +119,92 @@ function spawnDesktopAgent(): boolean {
     NUVI_AGENT_PORT: "8765",
   };
 
-  // Preferred path (packaged app): a PyInstaller-frozen agent exe that embeds
-  // its own Python runtime. Set by the Electron main process via NUVI_AGENT_EXE.
+  // Preferred path (packaged app): a PyInstaller-frozen agent exe.
   const frozenExe = process.env.NUVI_AGENT_EXE;
   if (frozenExe && fs.existsSync(frozenExe)) {
-    try {
-      const child = spawn(frozenExe, [], {
-        cwd: path.dirname(frozenExe),
-        detached: true,
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-        env: agentEnv,
-      });
-      lastAgentSpawnMethod = "frozen";
-      lastAgentSpawnError = null;
-
-      // Capture crash output for diagnostics
-      let stderrBuf = "";
-      child.stderr?.on("data", (d: Buffer) => { stderrBuf += d.toString(); });
-      child.on("error", (e: Error) => {
-        lastAgentSpawnError = `spawn error: ${e.message}`;
-        logError(`AGENT_SPAWN_FROZEN_ERROR pid=${child.pid}: ${e.message}`);
-      });
-      child.on("exit", (code: number | null, signal: string | null) => {
-        if (code !== 0 && code !== null) {
-          lastAgentSpawnError = `exited with code ${code}${signal ? ` (signal ${signal})` : ""}`;
-          if (stderrBuf.trim()) lastAgentSpawnError += `: ${stderrBuf.trim().substring(0, 300)}`;
-          logError(`AGENT_SPAWN_FROZEN_DIED pid=${child.pid} code=${code} signal=${signal}: ${stderrBuf.trim().substring(0, 300)}`);
-        }
-      });
-
-      child.unref();
-      logStartup(`AGENT_SPAWN frozen exe pid=${child.pid} path=${frozenExe}`);
-      console.log(`[Desktop Agent] Launched frozen agent (PID ${child.pid}).`);
-      return true;
-    } catch (e: any) {
-      lastAgentSpawnError = `spawn exception: ${e?.message || e}`;
-      logError(`AGENT_SPAWN_FROZEN_FAILED: ${e?.message || e}`);
-      // fall through to the Python path below
-    }
+    const result = spawnFrozenAgent(frozenExe, agentEnv);
+    if (result) return true;
+    console.log("[Desktop Agent] Frozen agent failed, falling back to Python source...");
   }
 
-  // Development fallback: run the agent from source using a local Python.
+  // Fallback: run the agent from source using a local Python.
+  return spawnPythonAgent(agentEnv);
+}
+
+/**
+ * Spawn the frozen exe and wait briefly (2s) to detect immediate crashes.
+ * Returns true only if the process is still alive after the wait.
+ */
+function spawnFrozenAgent(frozenExe: string, agentEnv: NodeJS.ProcessEnv): boolean {
+  try {
+    let exitedImmediately = false;
+    let exitCode: number | null = null;
+
+    const child = spawn(frozenExe, [], {
+      cwd: path.dirname(frozenExe),
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+      env: agentEnv,
+    });
+
+    lastAgentSpawnMethod = "frozen";
+    lastAgentSpawnError = null;
+
+    let stderrBuf = "";
+    let stdoutBuf = "";
+    child.stdout?.on("data", (d: Buffer) => { stdoutBuf += d.toString(); });
+    child.stderr?.on("data", (d: Buffer) => { stderrBuf += d.toString(); });
+    child.on("error", (e: Error) => {
+      lastAgentSpawnError = `spawn error: ${e.message}`;
+      exitedImmediately = true;
+      logError(`AGENT_SPAWN_FROZEN_ERROR pid=${child.pid}: ${e.message}`);
+    });
+    child.on("exit", (code: number | null, signal: string | null) => {
+      exitedImmediately = true;
+      exitCode = code;
+      const combined = (stdoutBuf + stderrBuf).trim();
+      if (code !== 0 && code !== null) {
+        lastAgentSpawnError = `exited with code ${code}${signal ? ` (signal ${signal})` : ""}`;
+        if (combined) lastAgentSpawnError += `: ${combined.substring(0, 500)}`;
+        logError(`AGENT_SPAWN_FROZEN_DIED pid=${child.pid} code=${code} signal=${signal}: ${combined.substring(0, 500)}`);
+      } else if (combined) {
+        logStartup(`AGENT_SPAWN_FROZEN_OUTPUT pid=${child.pid}: ${combined.substring(0, 500)}`);
+      }
+    });
+
+    child.unref();
+    logStartup(`AGENT_SPAWN frozen exe pid=${child.pid} path=${frozenExe}`);
+    console.log(`[Desktop Agent] Launched frozen agent (PID ${child.pid}), waiting 2s to verify...`);
+
+    // Synchronously wait up to 2s for the process to crash
+    const start = Date.now();
+    while (Date.now() - start < 2000) {
+      if (exitedImmediately) break;
+      // Use a blocking sync wait (acceptable for 2s max)
+      const end = Date.now() + 50;
+      while (Date.now() < end) { /* busy wait */ }
+    }
+
+    if (exitedImmediately) {
+      lastAgentSpawnError = lastAgentSpawnError || `frozen exe exited immediately (code ${exitCode})`;
+      console.warn(`[Desktop Agent] Frozen agent died immediately (code ${exitCode}). Will try Python fallback.`);
+      return false;
+    }
+
+    console.log(`[Desktop Agent] Frozen agent still alive after 2s probe.`);
+    return true;
+  } catch (e: any) {
+    lastAgentSpawnError = `spawn exception: ${e?.message || e}`;
+    logError(`AGENT_SPAWN_FROZEN_FAILED: ${e?.message || e}`);
+    return false;
+  }
+}
+
+/**
+ * Spawn the Python agent from source using uvicorn.
+ */
+function spawnPythonAgent(agentEnv: NodeJS.ProcessEnv): boolean {
   const candidates = [
     process.env.NUVI_PYTHON,
     "C:\\Users\\MSI\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
